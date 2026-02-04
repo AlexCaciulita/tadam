@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, AlertCircle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
@@ -17,6 +18,14 @@ export default function UploadProgress({
   isUploading,
   onClose,
 }: UploadProgressProps) {
+  // Auto-dismiss once all uploads finish
+  useEffect(() => {
+    if (uploads.length > 0 && !isUploading) {
+      const timer = setTimeout(onClose, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [isUploading, uploads.length, onClose]);
+
   if (uploads.length === 0) return null;
 
   const completed = uploads.filter((u) => u.status === "success").length;
