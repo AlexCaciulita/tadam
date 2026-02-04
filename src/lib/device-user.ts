@@ -24,63 +24,58 @@ export function getDeviceId(): string {
 
 /**
  * Get or create a device user with a profile row in Supabase.
- * On first call, upserts a profile row. Caches the result.
+ * Uses upsert to avoid race conditions between select/insert.
+ * Caches the result in memory.
  */
 export async function getDeviceUser(): Promise<Profile> {
   if (cachedUser) return cachedUser;
 
   const id = getDeviceId();
+  const shortId = id.slice(0, 8);
   const supabase = createClient();
 
-  // Try to fetch existing profile
-  const { data: existing } = await supabase
+  // Upsert — creates if missing, returns existing if found
+  const { data, error } = await supabase
     .from("profiles")
-    .select("*")
-    .eq("id", id)
-    .single();
-
-  if (existing) {
-    cachedUser = existing as Profile;
-    return cachedUser;
-  }
-
-  // Create profile
-  const shortId = id.slice(0, 8);
-  const { data: newProfile, error } = await supabase
-    .from("profiles")
-    .insert({
-      id,
-      username: `user_${shortId}`,
-      display_name: `User ${shortId}`,
-    })
+    .upsert(
+      {
+        id,
+        username: `user_${shortId}`,
+        display_name: `User ${shortId}`,
+      },
+      { onConflict: "id", ignoreDuplicates: true }
+    )
     .select()
     .single();
 
-  if (error) {
-    // If insert fails (e.g. race condition), try fetching again
-    const { data: retry } = await supabase
+  if (data) {
+    cachedUser = data as Profile;
+    return cachedUser;
+  }
+
+  // If upsert didn't return data (ignoreDuplicates=true skips returning),
+  // fetch the existing row
+  if (error || !data) {
+    const { data: existing } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", id)
       .single();
 
-    if (retry) {
-      cachedUser = retry as Profile;
+    if (existing) {
+      cachedUser = existing as Profile;
       return cachedUser;
     }
-
-    // Fallback: return a synthetic profile
-    cachedUser = {
-      id,
-      username: `user_${shortId}`,
-      display_name: `User ${shortId}`,
-      avatar_url: null,
-      created_at: new Date().toISOString(),
-    };
-    return cachedUser;
   }
 
-  cachedUser = newProfile as Profile;
+  // Final fallback: return synthetic profile (won't be in DB)
+  cachedUser = {
+    id,
+    username: `user_${shortId}`,
+    display_name: `User ${shortId}`,
+    avatar_url: null,
+    created_at: new Date().toISOString(),
+  };
   return cachedUser;
 }
 

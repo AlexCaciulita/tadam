@@ -58,11 +58,15 @@ export default function CreateAlbumPage() {
 
       // Redirect to the new album
       router.push(`/album/${newAlbum.id}`);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error("Failed to create album:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to create album. Please try again."
-      );
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "object" && err !== null && "message" in err
+            ? String((err as { message: string }).message)
+            : "Failed to create album. Please try again.";
+      setError(msg);
       setLoading(false);
     }
   };
