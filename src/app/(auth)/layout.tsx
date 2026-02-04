@@ -1,0 +1,27 @@
+export default function AuthLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-foreground">Tadam</h1>
+          <p className="text-sm text-muted mt-1">Share moments together</p>
+        </div>
+
+        {/* Auth Card */}
+        <div className="bg-white rounded-2xl shadow-sm border border-border p-8">
+          {children}
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-muted mt-6">
+          © 2026 Playlog Group Inc. All rights reserved.
+        </p>
+      </div>
+    </div>
+  );
+}

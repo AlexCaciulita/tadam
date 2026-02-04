@@ -1,0 +1,103 @@
+"use client";
+
+import { useRef } from "react";
+import { ImagePlus } from "lucide-react";
+import { cn } from "@/lib/utils/cn";
+
+interface UploadButtonProps {
+  onFilesSelected: (files: FileList) => void;
+  className?: string;
+  variant?: "fab" | "inline" | "icon";
+}
+
+export default function UploadButton({
+  onFilesSelected,
+  className,
+  variant = "fab",
+}: UploadButtonProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = () => {
+    inputRef.current?.click();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      onFilesSelected(e.target.files);
+      // Reset input so same file can be selected again
+      e.target.value = "";
+    }
+  };
+
+  if (variant === "icon") {
+    return (
+      <>
+        <button
+          onClick={handleClick}
+          className={cn(
+            "p-2 rounded-lg hover:bg-surface transition-colors",
+            className
+          )}
+        >
+          <ImagePlus className="w-6 h-6 text-foreground" />
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onChange={handleChange}
+          className="hidden"
+        />
+      </>
+    );
+  }
+
+  if (variant === "inline") {
+    return (
+      <>
+        <button
+          onClick={handleClick}
+          className={cn(
+            "inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg font-medium text-sm hover:bg-primary-hover transition-colors",
+            className
+          )}
+        >
+          <ImagePlus className="w-4 h-4" />
+          Add media
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          onChange={handleChange}
+          className="hidden"
+        />
+      </>
+    );
+  }
+
+  // FAB (floating action button)
+  return (
+    <>
+      <button
+        onClick={handleClick}
+        className={cn(
+          "fixed bottom-20 right-4 md:bottom-6 md:right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-hover transition-all hover:scale-105 z-30",
+          className
+        )}
+      >
+        <ImagePlus className="w-6 h-6" />
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        onChange={handleChange}
+        className="hidden"
+      />
+    </>
+  );
+}
