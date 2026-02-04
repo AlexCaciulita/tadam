@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PlusSquare, Bell, Search, User } from "lucide-react";
+import { Home, PlusSquare, Bell, ScanLine, User } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
-  { href: "/find-friends", label: "Search", icon: Search },
+  { href: "/join", label: "Scan", icon: ScanLine },
   { href: "/create-album", label: "Create", icon: PlusSquare },
   { href: "/notifications", label: "Alerts", icon: Bell },
   { href: "/settings", label: "Profile", icon: User },

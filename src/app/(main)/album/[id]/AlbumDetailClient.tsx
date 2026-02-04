@@ -51,6 +51,7 @@ export default function AlbumDetailClient({
   const [tasks, setTasks] = useState<MediaTask[]>(initialTasks);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [localMedia, setLocalMedia] = useState<Media[]>([]);
+  const [copied, setCopied] = useState(false);
 
   // Determine ownership client-side via device ID
   useEffect(() => {
@@ -84,11 +85,58 @@ export default function AlbumDetailClient({
   // Combine initial media with locally uploaded media
   const allMedia = [...localMedia, ...initialMedia];
 
+  const joinUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/join/${album.join_code}`
+      : `/join/${album.join_code}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(joinUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers
+      const input = document.createElement("input");
+      input.value = joinUrl;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      document.body.removeChild(input);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: album.name,
+          text: `Join my album "${album.name}" on Tadam!`,
+          url: joinUrl,
+        });
+      } catch {
+        // User cancelled or share failed — fall back to copy
+        handleCopyLink();
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
   return (
     <div>
       {/* Action bar */}
       <div className="flex items-center justify-end gap-2 mb-4">
         <UploadButton onFilesSelected={handleFilesSelected} variant="icon" />
+        <button
+          onClick={handleShowQR}
+          className="p-2 rounded-lg hover:bg-surface transition-colors"
+          title="Share Album"
+        >
+          <Share2 className="w-6 h-6 text-foreground" />
+        </button>
         <button
           onClick={() => setShowPrompts(!showPrompts)}
           className="p-2 rounded-lg hover:bg-surface transition-colors"
@@ -246,7 +294,7 @@ export default function AlbumDetailClient({
       <Modal isOpen={showQR} onClose={() => setShowQR(false)} title="Share Album">
         <div className="text-center">
           {qrDataUrl && (
-            <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4" />
+            <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4 w-48 h-48" />
           )}
           <div className="bg-surface rounded-lg p-4 mb-4">
             <p className="text-sm text-muted mb-1">Join Code</p>
@@ -254,9 +302,37 @@ export default function AlbumDetailClient({
               {album.join_code}
             </p>
           </div>
-          <p className="text-sm text-muted">
-            Share this QR code or join code with your guests
-          </p>
+
+          {/* Copyable link */}
+          <div className="bg-surface rounded-lg p-3 mb-4">
+            <p className="text-xs text-muted mb-1.5">Share link</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-foreground truncate flex-1 text-left font-mono">
+                {joinUrl}
+              </p>
+              <button
+                onClick={handleCopyLink}
+                className="text-xs font-medium text-primary hover:text-primary/80 whitespace-nowrap px-2 py-1 rounded bg-primary/10 transition-colors"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          {/* Share + Copy buttons */}
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleCopyLink}
+            >
+              {copied ? "Copied!" : "Copy Link"}
+            </Button>
+            <Button className="flex-1" onClick={handleNativeShare}>
+              <Share2 className="w-4 h-4" />
+              Share
+            </Button>
+          </div>
         </div>
       </Modal>
 

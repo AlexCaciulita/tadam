@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Home,
   PlusSquare,
+  ScanLine,
   Bell,
   Search,
   Users,
@@ -23,6 +24,7 @@ interface SidebarProps {
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/create-album", label: "Create album", icon: PlusSquare },
+  { href: "/join", label: "Join album", icon: ScanLine },
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/find-friends", label: "Find friends", icon: Search },
   { href: "/friends", label: "View friends", icon: Users },
