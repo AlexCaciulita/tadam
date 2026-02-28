@@ -6,7 +6,7 @@ import { Lock, UserPlus } from "lucide-react";
 import Button from "@/components/shared/Button";
 import Toggle from "@/components/shared/Toggle";
 import Avatar from "@/components/shared/Avatar";
-import { generateJoinCode } from "@/lib/utils/qr-generate";
+import { generateAlbumPublicToken, generateJoinCode } from "@/lib/utils/qr-generate";
 import { getDeviceUser } from "@/lib/device-user";
 
 export default function CreateAlbumPage() {
@@ -29,8 +29,9 @@ export default function CreateAlbumPage() {
       const supabase = createClient();
       const deviceUser = await getDeviceUser();
 
-      // Generate a unique join code
+      // Generate stable invite identifiers
       const joinCode = generateJoinCode();
+      const publicToken = generateAlbumPublicToken();
 
       // Insert the album
       const { data: newAlbum, error: insertError } = await supabase
@@ -39,6 +40,7 @@ export default function CreateAlbumPage() {
           name: name.trim(),
           description: description.trim() || null,
           join_code: joinCode,
+          public_token: publicToken,
           is_private: isPrivate,
           owner_id: deviceUser.id,
         })

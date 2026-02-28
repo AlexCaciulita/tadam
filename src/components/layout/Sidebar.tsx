@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Home,
-  PlusSquare,
-  ScanLine,
-  Bell,
-  Search,
-  Users,
-  Bookmark,
+  Images,
+  Share2,
   Settings,
-  LogOut,
+  Users,
+  Heart,
+  FolderOpen,
 } from "lucide-react";
 import Avatar from "@/components/shared/Avatar";
+import BrandLogo from "@/components/shared/BrandLogo";
 import { cn } from "@/lib/utils/cn";
+import { createClient } from "@/lib/supabase/client";
+import { getActiveAlbumId } from "@/lib/active-album";
 import type { Profile } from "@/types/database";
 
 interface SidebarProps {
@@ -22,87 +24,136 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/create-album", label: "Create album", icon: PlusSquare },
-  { href: "/join", label: "Join album", icon: ScanLine },
-  { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/find-friends", label: "Find friends", icon: Search },
-  { href: "/friends", label: "View friends", icon: Users },
-  { href: "/saved", label: "Saved albums", icon: Bookmark },
+  { href: "/home", label: "My Wedding", icon: Home },
+  { href: "/album", label: "Album", icon: Images },
+  { href: "/share", label: "Share", icon: Share2 },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
-const bottomItems = [
-  { href: "/settings", label: "Settings", icon: Settings },
+const adminNavItems = [
+  { href: "/admin?tab=profiles", label: "Profiles", icon: Users, tab: "profiles" },
+  { href: "/admin?tab=couples", label: "Couples", icon: Heart, tab: "couples" },
+  { href: "/admin?tab=albums", label: "Albums", icon: FolderOpen, tab: "albums" },
 ];
 
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [displayUser, setDisplayUser] = useState<Profile | null>(user);
+  const isAdmin = user?.role === "platform_admin";
+  const inAdminCenter = isAdmin && pathname.startsWith("/admin");
+  const activeAdminTab = searchParams.get("tab") || "profiles";
+  const albumIdFromQuery = searchParams.get("album") || "";
+  const allNavItems = inAdminCenter ? adminNavItems : navItems;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolveDisplayUser = async () => {
+      if (!user) {
+        setDisplayUser(null);
+        return;
+      }
+
+      if (user.role !== "platform_admin" || inAdminCenter) {
+        setDisplayUser(user);
+        return;
+      }
+
+      const pathParts = pathname.split("/").filter(Boolean);
+      const albumIdFromPath = pathParts[0] === "album" ? pathParts[1] : "";
+      const activeAlbumId = albumIdFromPath || albumIdFromQuery || getActiveAlbumId();
+
+      if (!activeAlbumId) {
+        setDisplayUser(user);
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        const { data: album } = await supabase
+          .from("albums")
+          .select("owner_id")
+          .eq("id", activeAlbumId)
+          .maybeSingle();
+
+        if (!album?.owner_id || album.owner_id === user.id) {
+          if (!cancelled) setDisplayUser(user);
+          return;
+        }
+
+        const { data: ownerProfile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", album.owner_id)
+          .maybeSingle();
+
+        if (!cancelled) {
+          setDisplayUser((ownerProfile as Profile | null) || user);
+        }
+      } catch {
+        if (!cancelled) setDisplayUser(user);
+      }
+    };
+
+    resolveDisplayUser();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, pathname, inAdminCenter, albumIdFromQuery]);
 
   return (
-    <aside className="hidden md:flex flex-col h-screen sticky top-0 w-60 border-r border-border bg-white py-6 px-4">
-      {/* Avatar */}
+    <aside className="hidden md:flex flex-col h-screen sticky top-0 w-64 border-r border-border/80 bg-white/85 backdrop-blur-sm py-6 px-4">
+      <div className="flex items-center gap-2 mb-6 px-2">
+        <BrandLogo size="md" />
+        <p className="text-lg font-semibold tracking-tight text-foreground">MemoriesBox</p>
+      </div>
+
       <div className="flex justify-center mb-6">
-        <Avatar
-          src={user?.avatar_url}
-          alt={user?.display_name || "User"}
-          size="xl"
-        />
+        <div className="text-center">
+          <div className="ig-story-ring inline-flex">
+            <Avatar
+              src={displayUser?.avatar_url}
+              alt={displayUser?.display_name || "User"}
+              size="xl"
+              className="border-2 border-white"
+            />
+          </div>
+          <p className="mt-3 text-sm font-semibold text-foreground truncate max-w-[180px]">
+            {displayUser?.display_name || "Your Wedding"}
+          </p>
+          <p className="text-xs text-muted truncate max-w-[180px]">
+            {displayUser?.username ? `@${displayUser.username}` : "wedding account"}
+          </p>
+        </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-1">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+      <nav className="flex-1 space-y-1.5">
+        {allNavItems.map((item) => {
+          const isActive = inAdminCenter
+            ? "tab" in item && item.tab === activeAdminTab
+            : pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           return (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors",
                 isActive
                   ? "text-foreground bg-surface"
-                  : "text-muted hover:text-foreground hover:bg-surface/50"
+                  : "text-muted hover:text-foreground hover:bg-surface/65"
               )}
             >
-              <Icon
-                className={cn("w-5 h-5", isActive && "fill-current")}
-                strokeWidth={isActive ? 2.5 : 2}
-              />
+              <Icon className={cn("w-5 h-5")} strokeWidth={isActive ? 2.5 : 2} />
               {item.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Bottom items */}
-      <div className="space-y-1 pt-4 border-t border-border">
-        {bottomItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                isActive
-                  ? "text-foreground bg-surface"
-                  : "text-muted hover:text-foreground hover:bg-surface/50"
-              )}
-            >
-              <Icon className="w-5 h-5" />
-              {item.label}
-            </Link>
-          );
-        })}
-        <button
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-muted hover:text-foreground hover:bg-surface/50 transition-colors w-full"
-        >
-          <LogOut className="w-5 h-5" />
-          Log out
-        </button>
-      </div>
     </aside>
   );
 }

@@ -95,30 +95,44 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
         const dimensions = await getImageDimensions(compressed);
         updateUpload(uploadFile.id, { progress: 20 });
 
-        // Step 3: Upload to Supabase Storage
+        // Step 3: Upload file to R2 through same-origin API route
         updateUpload(uploadFile.id, { status: "uploading", progress: 30 });
 
-        const fileExt = compressed.name.split(".").pop() || "jpg";
-        const fileName = `${albumId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${fileExt}`;
         const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
+        const formData = new FormData();
+        formData.append("albumId", albumId);
+        formData.append("file", compressed, compressed.name);
 
-        const { data: storageData, error: storageError } = await supabase.storage
-          .from("media")
-          .upload(fileName, compressed, {
-            cacheControl: "3600",
-            upsert: false,
-          });
+        const uploadApiResponse = await fetch("/api/uploads/r2/upload", {
+          method: "POST",
+          body: formData,
+        });
 
-        if (storageError) throw storageError;
+        if (!uploadApiResponse.ok) {
+          const contentType = uploadApiResponse.headers.get("content-type") || "";
+          let errorMessage = "Failed to upload file";
+
+          if (contentType.includes("application/json")) {
+            const errorData = (await uploadApiResponse.json().catch(() => ({}))) as {
+              error?: string;
+            };
+            errorMessage = errorData.error || errorMessage;
+          } else {
+            const errorText = await uploadApiResponse.text().catch(() => "");
+            if (errorText) {
+              errorMessage = errorText;
+            }
+          }
+
+          throw new Error(errorMessage);
+        }
+
+        const { fileUrl, objectKey } = (await uploadApiResponse.json()) as {
+          fileUrl: string;
+          objectKey: string;
+        };
 
         updateUpload(uploadFile.id, { progress: 70 });
-
-        // Step 4: Get public URL
-        const { data: urlData } = supabase.storage
-          .from("media")
-          .getPublicUrl(storageData.path);
-
-        updateUpload(uploadFile.id, { progress: 85 });
 
         // Step 5: Insert media record
         const { data: mediaData, error: dbError } = await supabase
@@ -127,7 +141,9 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
             album_id: albumId,
             uploader_id: guestName ? null : (await import("@/lib/device-user")).getDeviceId(),
             guest_name: guestName || null,
-            file_url: urlData.publicUrl,
+            file_url: fileUrl,
+            storage_provider: "r2",
+            storage_key: objectKey,
             media_type: mediaType,
             width: dimensions.width,
             height: dimensions.height,
@@ -137,11 +153,12 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
           .single();
 
         if (dbError) throw dbError;
+        updateUpload(uploadFile.id, { progress: 85 });
 
         updateUpload(uploadFile.id, {
           status: "success",
           progress: 100,
-          url: urlData.publicUrl,
+          url: fileUrl,
         });
 
         onUploadComplete?.(mediaData as Media);

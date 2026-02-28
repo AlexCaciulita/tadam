@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { QrCode, ArrowRight } from "lucide-react";
+import BrandLogo from "@/components/shared/BrandLogo";
 import CodeInput from "@/components/shared/CodeInput";
 import QRScanner from "@/components/shared/QRScanner";
 import Button from "@/components/shared/Button";
@@ -25,22 +26,47 @@ export default function JoinPage() {
 
   const handleScan = (result: string) => {
     setShowScanner(false);
-    // If it's a full URL, extract the code
-    const match = result.match(/\/join\/([A-Z0-9]{6})/i);
-    const scannedCode = match ? match[1] : result;
+    try {
+      const url = new URL(result);
+      const tokenMatch = url.pathname.match(/^\/join\/a\/([a-z0-9]+)$/i);
+      if (tokenMatch) {
+        router.push(`/join/a/${tokenMatch[1].toLowerCase()}`);
+        return;
+      }
 
-    if (scannedCode.length === 6) {
-      router.push(`/join/${scannedCode.toUpperCase()}`);
-    } else {
-      setError("Invalid QR code");
+      const codeMatch = url.pathname.match(/^\/join\/([A-Z0-9]{6})$/i);
+      if (codeMatch) {
+        router.push(`/join/${codeMatch[1].toUpperCase()}`);
+        return;
+      }
+    } catch {
+      const tokenMatch = result.match(/\/join\/a\/([a-z0-9]+)/i);
+      if (tokenMatch) {
+        router.push(`/join/a/${tokenMatch[1].toLowerCase()}`);
+        return;
+      }
+      const codeMatch = result.match(/\/join\/([A-Z0-9]{6})/i);
+      if (codeMatch) {
+        router.push(`/join/${codeMatch[1].toUpperCase()}`);
+        return;
+      }
+      if (result.length === 6) {
+        router.push(`/join/${result.toUpperCase()}`);
+        return;
+      }
     }
+
+    setError("Invalid QR code");
   };
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Header */}
       <div className="text-center pt-12 pb-8 px-6">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Tadam</h1>
+        <div className="flex justify-center mb-3">
+          <BrandLogo size="lg" />
+        </div>
+        <h1 className="text-3xl font-bold text-foreground mb-2">MemoriesBox</h1>
         <p className="text-muted">Join an album to start sharing photos</p>
       </div>
 

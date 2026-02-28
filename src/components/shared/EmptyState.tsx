@@ -18,7 +18,7 @@ export default function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center py-16 px-6 text-center",
+        "ig-card flex flex-col items-center justify-center py-14 px-6 text-center",
         className
       )}
     >

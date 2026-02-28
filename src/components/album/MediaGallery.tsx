@@ -1,44 +1,61 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import MediaItem from "./MediaItem";
 import { useRealtime } from "@/hooks/useRealtime";
 import type { Media } from "@/types/database";
 
+export type MediaGalleryView = "grid" | "feed";
+
 interface MediaGalleryProps {
   albumId: string;
   initialMedia: Media[];
+  view?: MediaGalleryView;
 }
 
-export default function MediaGallery({ albumId, initialMedia }: MediaGalleryProps) {
-  const [media, setMedia] = useState<Media[]>(initialMedia);
-
-  // Sync with parent when initialMedia changes (e.g., demo uploads)
-  useEffect(() => {
-    setMedia((prev) => {
-      // Merge: keep any realtime-added items + add new items from parent
-      const existingIds = new Set(prev.map((m) => m.id));
-      const newFromParent = initialMedia.filter((m) => !existingIds.has(m.id));
-      if (newFromParent.length === 0 && prev.length === initialMedia.length) return prev;
-      // Use parent's list as source of truth, but preserve realtime additions
-      const parentIds = new Set(initialMedia.map((m) => m.id));
-      const realtimeOnly = prev.filter((m) => !parentIds.has(m.id));
-      return [...realtimeOnly, ...initialMedia];
-    });
-  }, [initialMedia]);
+export default function MediaGallery({
+  albumId,
+  initialMedia,
+  view = "grid",
+}: MediaGalleryProps) {
+  const [realtimeMedia, setRealtimeMedia] = useState<Media[]>([]);
+  const [deletedMediaIds, setDeletedMediaIds] = useState<string[]>([]);
 
   const handleNewMedia = useCallback((newMedia: Media) => {
-    setMedia((prev) => {
-      // Avoid duplicates
-      if (prev.some((m) => m.id === newMedia.id)) return prev;
+    setDeletedMediaIds((prev) => prev.filter((id) => id !== newMedia.id));
+    setRealtimeMedia((prev) => {
+      if (prev.some((m) => m.id === newMedia.id)) {
+        return prev.map((m) => (m.id === newMedia.id ? newMedia : m));
+      }
       return [newMedia, ...prev];
     });
   }, []);
 
   const handleDeleteMedia = useCallback((deletedMedia: Media) => {
-    setMedia((prev) => prev.filter((m) => m.id !== deletedMedia.id));
+    setDeletedMediaIds((prev) => {
+      if (prev.includes(deletedMedia.id)) return prev;
+      return [...prev, deletedMedia.id];
+    });
+    setRealtimeMedia((prev) => prev.filter((m) => m.id !== deletedMedia.id));
   }, []);
+
+  const media = useMemo(() => {
+    const hiddenIds = new Set(deletedMediaIds);
+    const merged = new Map<string, Media>();
+
+    for (const item of initialMedia) {
+      if (!hiddenIds.has(item.id)) merged.set(item.id, item);
+    }
+
+    for (const item of realtimeMedia) {
+      if (!hiddenIds.has(item.id)) merged.set(item.id, item);
+    }
+
+    return Array.from(merged.values()).sort(
+      (a, b) => +new Date(b.created_at) - +new Date(a.created_at)
+    );
+  }, [initialMedia, realtimeMedia, deletedMediaIds]);
 
   // Real-time subscription
   useRealtime({
@@ -52,8 +69,28 @@ export default function MediaGallery({ albumId, initialMedia }: MediaGalleryProp
     return null;
   }
 
+  if (view === "feed") {
+    return (
+      <div className="max-w-xl mx-auto space-y-4">
+        <AnimatePresence>
+          {media.map((item) => (
+            <motion.div
+              key={item.id}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              transition={{ duration: 0.25 }}
+            >
+              <MediaItem media={item} view="feed" />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
       <AnimatePresence>
         {media.map((item) => (
           <motion.div
@@ -63,7 +100,7 @@ export default function MediaGallery({ albumId, initialMedia }: MediaGalleryProp
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.3 }}
           >
-            <MediaItem media={item} />
+            <MediaItem media={item} view="grid" />
           </motion.div>
         ))}
       </AnimatePresence>

@@ -12,9 +12,10 @@ const isDemoMode = () => {
 
 interface MediaItemProps {
   media: Media;
+  view?: "grid" | "feed";
 }
 
-export default function MediaItem({ media }: MediaItemProps) {
+export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
   const [liked, setLiked] = useState(media.user_has_reacted || false);
   const [likeCount, setLikeCount] = useState(media.reaction_count || 0);
   const [showFullscreen, setShowFullscreen] = useState(false);
@@ -59,58 +60,104 @@ export default function MediaItem({ media }: MediaItemProps) {
     }
   };
 
+  const mediaPreview = (
+    <>
+      {media.media_type === "video" ? (
+        <>
+          <video
+            src={media.file_url}
+            className="w-full h-full object-cover"
+            muted
+            playsInline
+          />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+              <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+            </div>
+          </div>
+        </>
+      ) : (
+        <img
+          src={media.file_url}
+          alt=""
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+        />
+      )}
+    </>
+  );
+
   return (
     <>
-      <div
-        className="relative aspect-square rounded-lg overflow-hidden bg-surface cursor-pointer group"
-        onClick={() => setShowFullscreen(true)}
-      >
-        {media.media_type === "video" ? (
-          <>
-            <video
-              src={media.file_url}
-              className="w-full h-full object-cover"
-              muted
-              playsInline
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
-                <Play className="w-5 h-5 text-white fill-white ml-0.5" />
-              </div>
+      {view === "feed" ? (
+        <article className="ig-card overflow-hidden">
+          <div
+            className="relative aspect-[4/5] overflow-hidden bg-surface cursor-pointer group"
+            onClick={() => setShowFullscreen(true)}
+          >
+            {mediaPreview}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="px-3.5 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
+                {media.guest_name || "Wedding Guest"}
+              </p>
+              <p className="text-xs text-muted">
+                {new Date(media.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
             </div>
-          </>
-        ) : (
-          <img
-            src={media.file_url}
-            alt=""
-            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-            loading="lazy"
-          />
-        )}
-
-        {/* Hover overlay with heart */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
             <button
               onClick={handleLike}
-              className="flex items-center gap-1 text-white"
+              className="flex items-center gap-1.5 text-foreground bg-surface px-2.5 py-1.5 rounded-full hover:bg-surface/80 transition-colors"
             >
               <Heart
                 className={cn(
-                  "w-5 h-5 transition-all",
-                  liked ? "fill-danger text-danger scale-110" : "text-white"
+                  "w-4 h-4 transition-all",
+                  liked ? "fill-danger text-danger scale-110" : "text-muted"
                 )}
               />
-              {likeCount > 0 && (
-                <span className="text-xs font-medium">{likeCount}</span>
-              )}
+              <span className="text-xs font-medium">{likeCount}</span>
             </button>
-            {media.guest_name && (
-              <span className="text-xs text-white/80">{media.guest_name}</span>
-            )}
+          </div>
+        </article>
+      ) : (
+        <div
+          className="relative aspect-square rounded-xl overflow-hidden bg-surface cursor-pointer group border border-border shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
+          onClick={() => setShowFullscreen(true)}
+        >
+          {mediaPreview}
+
+          {/* Hover overlay with heart */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/0 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              <button
+                onClick={handleLike}
+                className="flex items-center gap-1.5 text-white bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-full"
+              >
+                <Heart
+                  className={cn(
+                    "w-4 h-4 transition-all",
+                    liked ? "fill-danger text-danger scale-110" : "text-white"
+                  )}
+                />
+                {likeCount > 0 && (
+                  <span className="text-xs font-medium">{likeCount}</span>
+                )}
+              </button>
+              {media.guest_name && (
+                <span className="text-[11px] text-white/90 bg-black/30 backdrop-blur-sm px-2 py-1 rounded-full">
+                  {media.guest_name}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Fullscreen lightbox */}
       {showFullscreen && (

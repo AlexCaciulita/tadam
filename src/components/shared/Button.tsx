@@ -21,9 +21,9 @@ export default function Button({
 }: ButtonProps) {
   const variants = {
     primary:
-      "bg-primary text-white hover:bg-primary-hover disabled:bg-disabled disabled:text-white/70",
+      "ig-gradient ig-gradient-hover text-white shadow-sm disabled:bg-disabled disabled:text-white/70 disabled:shadow-none",
     outline:
-      "border border-primary text-primary hover:bg-primary/5 disabled:border-disabled disabled:text-disabled",
+      "border border-border text-foreground hover:bg-surface disabled:border-disabled disabled:text-disabled",
     ghost:
       "text-foreground hover:bg-surface disabled:text-disabled",
     danger:

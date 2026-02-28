@@ -1,5 +1,30 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Cloudflare R2 Storage Setup
+
+This project stores metadata in Supabase, but uploads media files to Cloudflare R2.
+
+Add the following env vars to `.env.local`:
+
+```bash
+# Existing Supabase vars
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+
+# Cloudflare R2 vars
+CLOUDFLARE_R2_ACCOUNT_ID=...
+CLOUDFLARE_R2_ACCESS_KEY_ID=...
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=...
+CLOUDFLARE_R2_BUCKET=...
+
+# Public URL used to serve files (custom domain or r2.dev domain)
+NEXT_PUBLIC_R2_PUBLIC_URL=https://media.your-domain.com
+```
+
+Run the migration to add R2 metadata columns on `media`:
+
+`supabase/migrations/002_r2_storage_columns.sql`
+
 ## Getting Started
 
 First, run the development server:

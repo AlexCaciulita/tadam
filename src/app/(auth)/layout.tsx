@@ -1,3 +1,5 @@
+import BrandLogo from "@/components/shared/BrandLogo";
+
 export default function AuthLayout({
   children,
 }: {
@@ -8,7 +10,10 @@ export default function AuthLayout({
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Tadam</h1>
+          <div className="flex justify-center mb-3">
+            <BrandLogo size="lg" />
+          </div>
+          <h1 className="text-3xl font-bold text-foreground">MemoriesBox</h1>
           <p className="text-sm text-muted mt-1">Share moments together</p>
         </div>
 

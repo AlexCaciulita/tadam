@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-background: #ffffff;
-  --color-foreground: #1a1a1a;
-  --color-primary: #5B5FC7;
-  --color-primary-hover: #4A4EB5;
-  --color-primary-light: #EDEDFA;
-  --color-accent: #F5A623;
-  --color-accent-hover: #E09610;
-  --color-surface: #F0F0F8;
-  --color-border: #E5E7EB;
-  --color-muted: #6B7280;
-  --color-disabled: #D1D5DB;
-  --color-danger: #EF4444;
-  --color-success: #22C55E;
+  --color-background: #fafafa;
+  --color-foreground: #111827;
+  --color-primary: #e1306c;
+  --color-primary-hover: #c52b5f;
+  --color-primary-light: #fde7ef;
+  --color-accent: #f77737;
+  --color-accent-hover: #df6a31;
+  --color-surface: #f3f4f6;
+  --color-border: #dfe3e8;
+  --color-muted: #6b7280;
+  --color-disabled: #d1d5db;
+  --color-danger: #ef4444;
+  --color-success: #22c55e;
 
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-jakarta);
 }
 
 * {
@@ -28,7 +28,10 @@ html {
 }
 
 body {
-  background: var(--color-background);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(247, 119, 55, 0.06), transparent 40%),
+    radial-gradient(circle at 90% 0%, rgba(225, 48, 108, 0.07), transparent 35%),
+    var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -59,6 +62,40 @@ a,
 input,
 textarea {
   transition: all 0.2s ease;
+}
+
+.ig-gradient {
+  background-image: linear-gradient(
+    135deg,
+    #f58529 0%,
+    #dd2a7b 52%,
+    #8134af 80%,
+    #515bd4 100%
+  );
+}
+
+.ig-gradient-hover:hover {
+  filter: saturate(1.05) brightness(0.96);
+}
+
+.ig-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.ig-soft-card {
+  background: #ffffffcc;
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+}
+
+.ig-story-ring {
+  background-image: linear-gradient(140deg, #f58529 0%, #dd2a7b 45%, #515bd4 100%);
+  padding: 2px;
+  border-radius: 9999px;
 }
 
 /* Mobile tap highlight */

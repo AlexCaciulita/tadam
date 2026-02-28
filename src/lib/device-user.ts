@@ -42,6 +42,7 @@ export async function getDeviceUser(): Promise<Profile> {
         id,
         username: `user_${shortId}`,
         display_name: `User ${shortId}`,
+        role: "user",
       },
       { onConflict: "id", ignoreDuplicates: true }
     )
@@ -74,6 +75,7 @@ export async function getDeviceUser(): Promise<Profile> {
     username: `user_${shortId}`,
     display_name: `User ${shortId}`,
     avatar_url: null,
+    role: "user",
     created_at: new Date().toISOString(),
   };
   return cachedUser;

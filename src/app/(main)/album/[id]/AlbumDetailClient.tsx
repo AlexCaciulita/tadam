@@ -3,13 +3,14 @@
 import { useState, useCallback, useEffect } from "react";
 import {
   Lock,
-  ImagePlus,
   CheckCircle,
   Bookmark,
   MoreHorizontal,
   UserPlus,
   Share2,
   Presentation,
+  LayoutGrid,
+  Rows3,
 } from "lucide-react";
 import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/shared/Button";
@@ -22,9 +23,15 @@ import LiveSlideshow from "@/components/album/LiveSlideshow";
 import PromptList from "@/components/prompts/PromptList";
 import CreatePrompt from "@/components/prompts/CreatePrompt";
 import { useUpload } from "@/hooks/useUpload";
-import { generateQRCode } from "@/lib/utils/qr-generate";
+import {
+  downloadDataUrl,
+  generateQRCodeFromUrl,
+  getAlbumJoinPath,
+} from "@/lib/utils/qr-generate";
 import { getDeviceId } from "@/lib/device-user";
+import { setActiveAlbumId } from "@/lib/active-album";
 import type { Album, AlbumMember, Media, MediaTask } from "@/types/database";
+import type { MediaGalleryView } from "@/components/album/MediaGallery";
 
 interface AlbumDetailClientProps {
   album: Album;
@@ -41,8 +48,6 @@ export default function AlbumDetailClient({
   tasks: initialTasks,
   albumOwnerId,
 }: AlbumDetailClientProps) {
-  const [isOwner, setIsOwner] = useState(false);
-  const [activeTab, setActiveTab] = useState<"media" | "activities">("media");
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [showSlideshow, setShowSlideshow] = useState(false);
@@ -52,12 +57,15 @@ export default function AlbumDetailClient({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [localMedia, setLocalMedia] = useState<Media[]>([]);
   const [copied, setCopied] = useState(false);
+  const [mediaView, setMediaView] = useState<MediaGalleryView>("grid");
 
-  // Determine ownership client-side via device ID
+  // Determine ownership client-side via device ID.
+  const isOwner = getDeviceId() === albumOwnerId;
+
+  // Persist active album context for Album/Share hub pages.
   useEffect(() => {
-    const deviceId = getDeviceId();
-    setIsOwner(deviceId === albumOwnerId);
-  }, [albumOwnerId]);
+    setActiveAlbumId(album.id);
+  }, [album.id]);
 
   const handleUploadComplete = useCallback((media: Media) => {
     setLocalMedia((prev) => {
@@ -76,7 +84,7 @@ export default function AlbumDetailClient({
   };
 
   const handleShowQR = async () => {
-    const dataUrl = await generateQRCode(album.join_code);
+    const dataUrl = await generateQRCodeFromUrl(joinUrl);
     setQrDataUrl(dataUrl);
     setShowQR(true);
     setShowMoreMenu(false);
@@ -85,10 +93,11 @@ export default function AlbumDetailClient({
   // Combine initial media with locally uploaded media
   const allMedia = [...localMedia, ...initialMedia];
 
+  const joinPath = getAlbumJoinPath(album.public_token, album.join_code);
   const joinUrl =
     typeof window !== "undefined"
-      ? `${window.location.origin}/join/${album.join_code}`
-      : `/join/${album.join_code}`;
+      ? `${window.location.origin}${joinPath}`
+      : joinPath;
 
   const handleCopyLink = async () => {
     try {
@@ -113,7 +122,7 @@ export default function AlbumDetailClient({
       try {
         await navigator.share({
           title: album.name,
-          text: `Join my album "${album.name}" on Tadam!`,
+          text: `Join my album "${album.name}" on MemoriesBox!`,
           url: joinUrl,
         });
       } catch {
@@ -125,6 +134,12 @@ export default function AlbumDetailClient({
     }
   };
 
+  const handleDownloadQR = () => {
+    if (!qrDataUrl) return;
+    const safeName = album.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    downloadDataUrl(qrDataUrl, `${safeName || "album"}-qr.png`);
+  };
+
   return (
     <div>
       {/* Action bar */}
@@ -132,27 +147,27 @@ export default function AlbumDetailClient({
         <UploadButton onFilesSelected={handleFilesSelected} variant="icon" />
         <button
           onClick={handleShowQR}
-          className="p-2 rounded-lg hover:bg-surface transition-colors"
+          className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
           title="Share Album"
         >
-          <Share2 className="w-6 h-6 text-foreground" />
+          <Share2 className="w-5 h-5 text-foreground" />
         </button>
         <button
           onClick={() => setShowPrompts(!showPrompts)}
-          className="p-2 rounded-lg hover:bg-surface transition-colors"
+          className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
           title="Media Tasks"
         >
-          <CheckCircle className="w-6 h-6 text-foreground" />
+          <CheckCircle className="w-5 h-5 text-foreground" />
         </button>
-        <button className="p-2 rounded-lg hover:bg-surface transition-colors">
-          <Bookmark className="w-6 h-6 text-foreground" />
+        <button className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors">
+          <Bookmark className="w-5 h-5 text-foreground" />
         </button>
         <div className="relative">
           <button
             onClick={() => setShowMoreMenu(!showMoreMenu)}
-            className="p-2 rounded-lg hover:bg-surface transition-colors"
+            className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
           >
-            <MoreHorizontal className="w-6 h-6 text-foreground" />
+            <MoreHorizontal className="w-5 h-5 text-foreground" />
           </button>
           {showMoreMenu && (
             <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-border py-1 z-20 min-w-[200px]">
@@ -179,7 +194,7 @@ export default function AlbumDetailClient({
       </div>
 
       {/* Album header */}
-      <div className="mb-6">
+      <div className="ig-card p-5 mb-5">
         <div className="flex items-center gap-2 mb-1">
           {album.is_private && <Lock className="w-4 h-4 text-muted" />}
           <h1 className="text-xl font-bold text-foreground">{album.name}</h1>
@@ -213,33 +228,49 @@ export default function AlbumDetailClient({
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-border mb-6">
-        <button
-          onClick={() => setActiveTab("media")}
-          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === "media"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted hover:text-foreground"
-          }`}
-        >
-          Shared Media
-        </button>
-        <button
-          onClick={() => setActiveTab("activities")}
-          className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === "activities"
-              ? "border-primary text-primary"
-              : "border-transparent text-muted hover:text-foreground"
-          }`}
-        >
-          Activities
-        </button>
+      {/* Media section header + view toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-foreground">Shared Media</h2>
+          <span className="text-xs text-muted">{allMedia.length}</span>
+        </div>
+
+        {allMedia.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted">View</span>
+            <div className="flex bg-white border border-border rounded-xl p-1">
+              <button
+                type="button"
+                onClick={() => setMediaView("grid")}
+                className={`p-2 rounded-lg transition-colors ${
+                  mediaView === "grid"
+                    ? "bg-primary-light text-primary"
+                    : "text-muted hover:text-foreground"
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaView("feed")}
+                className={`p-2 rounded-lg transition-colors ${
+                  mediaView === "feed"
+                    ? "bg-primary-light text-primary"
+                    : "text-muted hover:text-foreground"
+                }`}
+                title="Feed View"
+              >
+                <Rows3 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Prompts section */}
       {showPrompts && (
-        <div className="mb-6 p-4 bg-surface rounded-xl">
+        <div className="mb-6 p-4 ig-card">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm">Media Tasks</h3>
             {isOwner && (
@@ -252,31 +283,23 @@ export default function AlbumDetailClient({
         </div>
       )}
 
-      {/* Tab content */}
-      {activeTab === "media" ? (
-        allMedia.length > 0 ? (
-          <MediaGallery albumId={album.id} initialMedia={allMedia} />
-        ) : (
-          <EmptyState
-            title="Let's start sharing memories"
-            description="You can start inviting contributors or start adding your media to the album."
-            action={
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={handleShowQR}>
-                  Invite
-                </Button>
-                <UploadButton
-                  onFilesSelected={handleFilesSelected}
-                  variant="inline"
-                />
-              </div>
-            }
-          />
-        )
+      {allMedia.length > 0 ? (
+        <MediaGallery albumId={album.id} initialMedia={allMedia} view={mediaView} />
       ) : (
         <EmptyState
-          title="No activity yet"
-          description="Activity will show up here when members interact with the album."
+          title="Let's start sharing memories"
+          description="You can start inviting contributors or start adding your media to the album."
+          action={
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={handleShowQR}>
+                Invite
+              </Button>
+              <UploadButton
+                onFilesSelected={handleFilesSelected}
+                variant="inline"
+              />
+            </div>
+          }
         />
       )}
 
@@ -321,6 +344,14 @@ export default function AlbumDetailClient({
 
           {/* Share + Copy buttons */}
           <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleDownloadQR}
+              disabled={!qrDataUrl}
+            >
+              Download QR
+            </Button>
             <Button
               variant="outline"
               className="flex-1"

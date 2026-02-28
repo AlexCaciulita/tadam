@@ -3,6 +3,7 @@ export interface Profile {
   username: string;
   display_name: string | null;
   avatar_url: string | null;
+  role: "platform_admin" | "user";
   created_at: string;
 }
 
@@ -11,6 +12,7 @@ export interface Album {
   name: string;
   description: string | null;
   join_code: string;
+  public_token?: string;
   is_private: boolean;
   owner_id: string;
   cover_image_url: string | null;
@@ -39,6 +41,8 @@ export interface Media {
   guest_name: string | null;
   file_url: string;
   thumbnail_url: string | null;
+  storage_provider?: "r2" | "supabase";
+  storage_key?: string | null;
   media_type: "photo" | "video";
   width: number | null;
   height: number | null;

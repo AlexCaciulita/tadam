@@ -35,11 +35,11 @@ export default function UploadButton({
         <button
           onClick={handleClick}
           className={cn(
-            "p-2 rounded-lg hover:bg-surface transition-colors",
+            "p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors",
             className
           )}
         >
-          <ImagePlus className="w-6 h-6 text-foreground" />
+          <ImagePlus className="w-5 h-5 text-foreground" />
         </button>
         <input
           ref={inputRef}
@@ -59,7 +59,7 @@ export default function UploadButton({
         <button
           onClick={handleClick}
           className={cn(
-            "inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg font-medium text-sm hover:bg-primary-hover transition-colors",
+            "inline-flex items-center gap-2 px-5 py-2.5 ig-gradient ig-gradient-hover text-white rounded-xl font-semibold text-sm transition-all shadow-sm",
             className
           )}
         >
@@ -84,7 +84,7 @@ export default function UploadButton({
       <button
         onClick={handleClick}
         className={cn(
-          "fixed bottom-20 right-4 md:bottom-6 md:right-6 w-14 h-14 bg-primary text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-hover transition-all hover:scale-105 z-30",
+          "fixed bottom-20 right-4 md:bottom-6 md:right-6 w-14 h-14 ig-gradient ig-gradient-hover text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 z-30",
           className
         )}
       >

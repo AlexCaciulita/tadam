@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import MobileNav from "@/components/layout/MobileNav";
 import NotificationPanel from "@/components/layout/NotificationPanel";
+import BrandLogo from "@/components/shared/BrandLogo";
 import { getDeviceUser } from "@/lib/device-user";
 import type { Profile, Notification } from "@/types/database";
 
@@ -45,7 +46,7 @@ export default function MainLayoutClient({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
           <p className="text-sm text-muted">Loading...</p>
@@ -55,14 +56,22 @@ export default function MainLayoutClient({
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="flex">
+    <div className="min-h-screen bg-background">
+      <div className="flex min-h-screen">
         {/* Left Sidebar */}
         <Sidebar user={user} />
 
         {/* Main Content */}
-        <main className="flex-1 min-h-screen border-r border-border lg:border-r-0 pb-20 md:pb-0">
-          <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
+        <main className="flex-1 min-h-screen pb-20 md:pb-0">
+          <div className="max-w-4xl mx-auto px-4 md:px-6 py-5 md:py-8">
+            <header className="md:hidden mb-5 px-1 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BrandLogo size="md" />
+                <p className="text-lg font-semibold tracking-tight text-foreground">
+                  MemoriesBox
+                </p>
+              </div>
+            </header>
             {children}
           </div>
         </main>

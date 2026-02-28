@@ -8,9 +8,9 @@ import GuestUploadFlow from "@/components/guest/GuestUploadFlow";
 import type { Album, MediaTask } from "@/types/database";
 import { Loader2 } from "lucide-react";
 
-export default function JoinCodePage() {
+export default function JoinAlbumTokenPage() {
   const params = useParams();
-  const code = (params.code as string).toUpperCase();
+  const token = (params.token as string).toLowerCase();
   const [album, setAlbum] = useState<Album | null>(null);
   const [tasks, setTasks] = useState<MediaTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,18 +23,17 @@ export default function JoinCodePage() {
       const { data, error: fetchError } = await supabase
         .from("albums")
         .select("*")
-        .eq("join_code", code)
+        .eq("public_token", token)
         .single();
 
       if (fetchError || !data) {
-        setError("Album not found. Please check the code and try again.");
+        setError("Album not found. Please check the link and try again.");
         setLoading(false);
         return;
       }
 
       setAlbum(data as Album);
 
-      // Fetch tasks
       const { data: tasksData } = await supabase
         .from("media_tasks")
         .select("*")
@@ -46,7 +45,7 @@ export default function JoinCodePage() {
     };
 
     fetchAlbum();
-  }, [code]);
+  }, [token]);
 
   if (loading) {
     return (
@@ -63,13 +62,13 @@ export default function JoinCodePage() {
         <h1 className="text-xl font-bold text-foreground mb-2">Album not found</h1>
         <p className="text-sm text-muted text-center mb-6">{error}</p>
         <Link href="/join" className="text-primary font-medium hover:underline">
-          Try entering the code again
+          Try joining again
         </Link>
       </div>
     );
   }
 
   return (
-    <GuestUploadFlow album={album} tasks={tasks} joinCode={code} />
+    <GuestUploadFlow album={album} tasks={tasks} joinCode={album.join_code} />
   );
 }
