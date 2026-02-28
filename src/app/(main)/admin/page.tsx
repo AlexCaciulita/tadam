@@ -218,6 +218,121 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteProfile = async (profile: Profile) => {
+    const isCurrentAdmin = profile.id === adminId;
+    if (isCurrentAdmin) {
+      setMessage("You cannot delete the currently logged-in admin profile.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete @${profile.username} and all owned albums/media? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setBusy(`delete-profile-${profile.id}`);
+    setMessage(null);
+
+    try {
+      const supabase = createClient();
+      const ensureOk = (error: unknown) => {
+        if (error) throw error;
+      };
+
+      // 1) Find albums owned by this profile
+      const { data: ownedAlbumsData, error: ownedAlbumsError } = await supabase
+        .from("albums")
+        .select("id")
+        .eq("owner_id", profile.id);
+      ensureOk(ownedAlbumsError);
+
+      const ownedAlbumIds = (ownedAlbumsData || []).map((row: { id: string }) => row.id);
+
+      // 2) Remove album-bound rows first to satisfy FK constraints
+      if (ownedAlbumIds.length > 0) {
+        const { data: mediaRows, error: mediaRowsError } = await supabase
+          .from("media")
+          .select("id")
+          .in("album_id", ownedAlbumIds);
+        ensureOk(mediaRowsError);
+
+        const ownedMediaIds = (mediaRows || []).map((row: { id: string }) => row.id);
+
+        if (ownedMediaIds.length > 0) {
+          const { error: deleteReactionsByMediaError } = await supabase
+            .from("reactions")
+            .delete()
+            .in("media_id", ownedMediaIds);
+          ensureOk(deleteReactionsByMediaError);
+        }
+
+        const { error: deleteTasksByAlbumError } = await supabase
+          .from("media_tasks")
+          .delete()
+          .in("album_id", ownedAlbumIds);
+        ensureOk(deleteTasksByAlbumError);
+
+        const { error: deleteMembersByAlbumError } = await supabase
+          .from("album_members")
+          .delete()
+          .in("album_id", ownedAlbumIds);
+        ensureOk(deleteMembersByAlbumError);
+
+        const { error: deleteMediaByAlbumError } = await supabase
+          .from("media")
+          .delete()
+          .in("album_id", ownedAlbumIds);
+        ensureOk(deleteMediaByAlbumError);
+
+        const { error: deleteAlbumsError } = await supabase
+          .from("albums")
+          .delete()
+          .in("id", ownedAlbumIds);
+        ensureOk(deleteAlbumsError);
+      }
+
+      // 3) Remove profile-bound rows on remaining albums
+      const { error: deleteReactionsByUserError } = await supabase
+        .from("reactions")
+        .delete()
+        .eq("user_id", profile.id);
+      ensureOk(deleteReactionsByUserError);
+
+      const { error: deleteMembersByUserError } = await supabase
+        .from("album_members")
+        .delete()
+        .eq("user_id", profile.id);
+      ensureOk(deleteMembersByUserError);
+
+      const { error: deleteTasksByUserError } = await supabase
+        .from("media_tasks")
+        .delete()
+        .eq("created_by", profile.id);
+      ensureOk(deleteTasksByUserError);
+
+      const { error: clearUploaderError } = await supabase
+        .from("media")
+        .update({ uploader_id: null })
+        .eq("uploader_id", profile.id);
+      ensureOk(clearUploaderError);
+
+      // 4) Delete profile
+      const { error: profileDeleteError } = await supabase
+        .from("profiles")
+        .delete()
+        .eq("id", profile.id);
+      ensureOk(profileDeleteError);
+
+      setMessage(`Deleted @${profile.username}.`);
+      refresh();
+    } catch (error) {
+      console.error("Failed to delete profile", error);
+      setMessage("Failed to delete profile.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const getAlbumShareUrl = (album: Album) => getAlbumJoinUrl(album.public_token, album.join_code);
 
   const copyToClipboard = async (value: string, onCopied: () => void) => {
@@ -660,6 +775,16 @@ export default function AdminPage() {
                         className="text-xs px-2 py-1 rounded border border-border hover:bg-white"
                       >
                         Make User
+                      </button>
+                    )}
+                    {!isCurrentAdmin && (
+                      <button
+                        type="button"
+                        disabled={busy === `delete-profile-${profile.id}`}
+                        onClick={() => handleDeleteProfile(profile)}
+                        className="text-xs px-2 py-1 rounded border border-danger/30 text-danger hover:bg-danger/5 disabled:opacity-50"
+                      >
+                        Delete
                       </button>
                     )}
                   </div>

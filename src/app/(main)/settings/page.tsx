@@ -183,8 +183,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="ig-card p-5">
+    <div className="space-y-6 ig-reveal">
+      <div className="ig-feature-card p-6">
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-sm text-muted mt-1">Manage your profile and wedding account details.</p>
       </div>

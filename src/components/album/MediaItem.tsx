@@ -12,7 +12,7 @@ const isDemoMode = () => {
 
 interface MediaItemProps {
   media: Media;
-  view?: "grid" | "feed";
+  view?: "grid" | "feed" | "masonry";
 }
 
 export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
@@ -123,6 +123,52 @@ export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
               />
               <span className="text-xs font-medium">{likeCount}</span>
             </button>
+          </div>
+        </article>
+      ) : view === "masonry" ? (
+        <article
+          className="relative rounded-xl overflow-hidden bg-surface cursor-pointer group border border-border shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
+          onClick={() => setShowFullscreen(true)}
+        >
+          {media.media_type === "video" ? (
+            <div className="relative aspect-[4/5]">
+              <video
+                src={media.file_url}
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-black/50 flex items-center justify-center">
+                  <Play className="w-5 h-5 text-white fill-white ml-0.5" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <img
+              src={media.file_url}
+              alt=""
+              className="w-full h-auto block transition-transform duration-300 group-hover:scale-[1.02]"
+              loading="lazy"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+              <button
+                onClick={handleLike}
+                className="flex items-center gap-1.5 text-white bg-black/30 backdrop-blur-sm px-2.5 py-1 rounded-full"
+              >
+                <Heart
+                  className={cn(
+                    "w-4 h-4 transition-all",
+                    liked ? "fill-danger text-danger scale-110" : "text-white"
+                  )}
+                />
+                {likeCount > 0 && (
+                  <span className="text-xs font-medium">{likeCount}</span>
+                )}
+              </button>
+            </div>
           </div>
         </article>
       ) : (

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getDeviceUser } from "@/lib/device-user";
 import { getActiveAlbumId, setActiveAlbumId } from "@/lib/active-album";
 import AlbumGrid from "@/components/album/AlbumGrid";
+import AlbumStoryRail from "@/components/album/AlbumStoryRail";
 import EmptyState from "@/components/shared/EmptyState";
 import type { Album, Media, Profile } from "@/types/database";
 
@@ -147,8 +148,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-6">
-      <section className="ig-card p-5 sm:p-6">
+    <div className="space-y-6 ig-reveal">
+      <section className="ig-feature-card p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
@@ -180,7 +181,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      {albums.length > 0 && (
+        <AlbumStoryRail albums={albums} activeAlbumId={albums[0]?.id} />
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="ig-card p-4">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-muted">Albums</p>
@@ -214,7 +219,7 @@ export default function HomePage() {
           <section>
             <h2 className="text-lg font-semibold text-foreground mb-3">Recent Uploads</h2>
             {recentMedia.length > 0 ? (
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {recentMedia.map((item) => (
                   <Link
                     key={item.id}

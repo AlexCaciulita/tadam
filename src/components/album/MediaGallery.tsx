@@ -6,7 +6,7 @@ import MediaItem from "./MediaItem";
 import { useRealtime } from "@/hooks/useRealtime";
 import type { Media } from "@/types/database";
 
-export type MediaGalleryView = "grid" | "feed";
+export type MediaGalleryView = "grid" | "feed" | "masonry";
 
 interface MediaGalleryProps {
   albumId: string;
@@ -82,6 +82,27 @@ export default function MediaGallery({
               transition={{ duration: 0.25 }}
             >
               <MediaItem media={item} view="feed" />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  if (view === "masonry") {
+    return (
+      <div className="columns-2 md:columns-3 gap-2.5 [column-fill:_balance]">
+        <AnimatePresence>
+          {media.map((item) => (
+            <motion.div
+              key={item.id}
+              className="mb-2.5 break-inside-avoid"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.22 }}
+            >
+              <MediaItem media={item} view="masonry" />
             </motion.div>
           ))}
         </AnimatePresence>

@@ -11,6 +11,7 @@ import {
   Presentation,
   LayoutGrid,
   Rows3,
+  GalleryVerticalEnd,
 } from "lucide-react";
 import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/shared/Button";
@@ -141,7 +142,7 @@ export default function AlbumDetailClient({
   };
 
   return (
-    <div>
+    <div className="space-y-0 ig-reveal">
       {/* Action bar */}
       <div className="flex items-center justify-end gap-2 mb-4">
         <UploadButton onFilesSelected={handleFilesSelected} variant="icon" />
@@ -194,7 +195,7 @@ export default function AlbumDetailClient({
       </div>
 
       {/* Album header */}
-      <div className="ig-card p-5 mb-5">
+      <div className="ig-feature-card p-6 mb-6">
         <div className="flex items-center gap-2 mb-1">
           {album.is_private && <Lock className="w-4 h-4 text-muted" />}
           <h1 className="text-xl font-bold text-foreground">{album.name}</h1>
@@ -262,6 +263,18 @@ export default function AlbumDetailClient({
                 title="Feed View"
               >
                 <Rows3 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMediaView("masonry")}
+                className={`p-2 rounded-lg transition-colors ${
+                  mediaView === "masonry"
+                    ? "bg-primary-light text-primary"
+                    : "text-muted hover:text-foreground"
+                }`}
+                title="Masonry View"
+              >
+                <GalleryVerticalEnd className="w-4 h-4" />
               </button>
             </div>
           </div>

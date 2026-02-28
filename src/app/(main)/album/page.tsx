@@ -7,6 +7,7 @@ import { Loader2, ExternalLink, Share2, Images } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getDeviceUser } from "@/lib/device-user";
 import { getActiveAlbumId, setActiveAlbumId } from "@/lib/active-album";
+import AlbumStoryRail from "@/components/album/AlbumStoryRail";
 import EmptyState from "@/components/shared/EmptyState";
 import type { Album } from "@/types/database";
 
@@ -137,14 +138,22 @@ export default function AlbumHubPage() {
     );
   }
 
+  const activeAlbumId = selectedFromQuery || albums[0]?.id;
+
   return (
-    <div className="space-y-5">
-      <div className="ig-card p-5">
+    <div className="space-y-6 ig-reveal">
+      <div className="ig-feature-card p-6">
         <h1 className="text-2xl font-bold text-foreground">Album</h1>
         <p className="text-sm text-muted mt-1">
           Open your gallery, upload moments, or jump directly to sharing.
         </p>
       </div>
+
+      <AlbumStoryRail
+        albums={sortedAlbums}
+        activeAlbumId={activeAlbumId}
+        getHref={(album) => `/album/${album.id}`}
+      />
 
       <div className="space-y-3">
         {sortedAlbums.map((album) => (

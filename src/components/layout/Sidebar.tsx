@@ -45,6 +45,14 @@ export default function Sidebar({ user }: SidebarProps) {
   const activeAdminTab = searchParams.get("tab") || "profiles";
   const albumIdFromQuery = searchParams.get("album") || "";
   const allNavItems = inAdminCenter ? adminNavItems : navItems;
+  const headerDisplayName =
+    inAdminCenter && isAdmin ? "Admin" : displayUser?.display_name || "Your Wedding";
+  const headerUsername =
+    inAdminCenter && isAdmin
+      ? "@admin"
+      : displayUser?.username
+        ? `@${displayUser.username}`
+        : "wedding account";
 
   useEffect(() => {
     let cancelled = false;
@@ -121,10 +129,10 @@ export default function Sidebar({ user }: SidebarProps) {
             />
           </div>
           <p className="mt-3 text-sm font-semibold text-foreground truncate max-w-[180px]">
-            {displayUser?.display_name || "Your Wedding"}
+            {headerDisplayName}
           </p>
           <p className="text-xs text-muted truncate max-w-[180px]">
-            {displayUser?.username ? `@${displayUser.username}` : "wedding account"}
+            {headerUsername}
           </p>
         </div>
       </div>

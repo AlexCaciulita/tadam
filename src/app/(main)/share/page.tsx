@@ -190,8 +190,8 @@ export default function SharePage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="ig-card p-5">
+    <div className="space-y-6 ig-reveal">
+      <div className="ig-feature-card p-6">
         <h1 className="text-2xl font-bold text-foreground">Share</h1>
         <p className="text-sm text-muted mt-1">
           Permanent link and QR code for print cards and guest access.
