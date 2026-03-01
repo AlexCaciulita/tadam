@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createUploadUrl } from "@/lib/r2/server";
-import { createClient } from "@/lib/supabase/server";
 
 const MAX_AVATAR_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -20,7 +19,6 @@ function buildAvatarObjectKey(profileId: string, fileName: string) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
     const formData = await request.formData();
     const profileId = String(formData.get("profileId") || "").trim();
     const file = formData.get("file");
@@ -40,23 +38,6 @@ export async function POST(request: NextRequest) {
 
     if (fileSize > MAX_AVATAR_SIZE_BYTES) {
       return NextResponse.json({ error: "Avatar file is too large" }, { status: 413 });
-    }
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const requesterId = authData.user.id;
-    const { data: requesterProfile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", requesterId)
-      .maybeSingle();
-    const isAdmin = requesterProfile?.role === "platform_admin";
-    const canUploadAvatar = requesterId === profileId || isAdmin;
-    if (!canUploadAvatar) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const objectKey = buildAvatarObjectKey(profileId, fileName);

@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import LanguageSwitcher from "@/components/shared/LanguageSwitcher";
 import { LanguageProvider } from "@/lib/i18n/LanguageProvider";
 import "./globals.css";
+
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "MemoriesBox — Share Moments Together",
@@ -16,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="font-sans antialiased">
+      <body className={`${plusJakarta.variable} font-sans antialiased`}>
         <LanguageProvider>
           <LanguageSwitcher />
           {children}

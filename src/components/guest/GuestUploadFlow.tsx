@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Camera, ImageIcon, Check, Plus } from "lucide-react";
+import { Camera, ImageIcon, Check, Plus, ArrowLeft } from "lucide-react";
 import Button from "@/components/shared/Button";
 import PromptCard from "@/components/prompts/PromptCard";
 import GuestNameForm from "./GuestNameForm";
@@ -24,14 +24,8 @@ export default function GuestUploadFlow({
   tasks,
   joinCode,
 }: GuestUploadFlowProps) {
-  const [guestName, setGuestName] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem(`tadam_guest_${joinCode}`) || "";
-  });
-  const [step, setStep] = useState<Step>(() => {
-    if (typeof window === "undefined") return "name";
-    return localStorage.getItem(`tadam_guest_${joinCode}`) ? "picker" : "name";
-  });
+  const [step, setStep] = useState<Step>("name");
+  const [guestName, setGuestName] = useState("");
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,8 +33,16 @@ export default function GuestUploadFlow({
     useUpload({
       albumId: album.id,
       guestName,
-      joinCode,
     });
+
+  // Check if name is stored
+  useEffect(() => {
+    const stored = localStorage.getItem(`tadam_guest_${joinCode}`);
+    if (stored) {
+      setGuestName(stored);
+      setStep("picker");
+    }
+  }, [joinCode]);
 
   const handleNameSubmit = async (name: string) => {
     setGuestName(name);
