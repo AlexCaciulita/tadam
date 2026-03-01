@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/shared/Button";
@@ -14,8 +14,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") || "/home";
   const ADMIN_USERNAME_ALIAS = "admin";
   const ADMIN_EMAIL =
     process.env.NEXT_PUBLIC_ADMIN_LOGIN_EMAIL || "admin@memoriesbox.app";
@@ -24,6 +22,10 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const nextPath =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("next") || "/home"
+        : "/home";
 
     const supabase = createClient();
     let loginEmail = emailOrUsername.trim().toLowerCase();
