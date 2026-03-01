@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Avatar from "@/components/shared/Avatar";
 import BrandLogo from "@/components/shared/BrandLogo";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 import { cn } from "@/lib/utils/cn";
 import { createClient } from "@/lib/supabase/client";
 import { getActiveAlbumId } from "@/lib/active-album";
@@ -23,36 +24,39 @@ interface SidebarProps {
   user: Profile | null;
 }
 
-const navItems = [
-  { href: "/home", label: "My Wedding", icon: Home },
-  { href: "/album", label: "Album", icon: Images },
-  { href: "/share", label: "Share", icon: Share2 },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
-
-const adminNavItems = [
-  { href: "/admin?tab=profiles", label: "Profiles", icon: Users, tab: "profiles" },
-  { href: "/admin?tab=couples", label: "Couples", icon: Heart, tab: "couples" },
-  { href: "/admin?tab=albums", label: "Albums", icon: FolderOpen, tab: "albums" },
-];
-
 export default function Sidebar({ user }: SidebarProps) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [displayUser, setDisplayUser] = useState<Profile | null>(user);
+  const navItems = [
+    { href: "/home", label: t("sidebar.myWedding"), icon: Home },
+    { href: "/album", label: t("common.album"), icon: Images },
+    { href: "/share", label: t("common.share"), icon: Share2 },
+    { href: "/settings", label: t("common.settings"), icon: Settings },
+  ];
+
+  const adminNavItems = [
+    { href: "/admin?tab=profiles", label: t("common.profiles"), icon: Users, tab: "profiles" },
+    { href: "/admin?tab=couples", label: t("common.couples"), icon: Heart, tab: "couples" },
+    { href: "/admin?tab=albums", label: t("common.albums"), icon: FolderOpen, tab: "albums" },
+  ];
+
   const isAdmin = user?.role === "platform_admin";
   const inAdminCenter = isAdmin && pathname.startsWith("/admin");
   const activeAdminTab = searchParams.get("tab") || "profiles";
   const albumIdFromQuery = searchParams.get("album") || "";
   const allNavItems = inAdminCenter ? adminNavItems : navItems;
   const headerDisplayName =
-    inAdminCenter && isAdmin ? "Admin" : displayUser?.display_name || "Your Wedding";
+    inAdminCenter && isAdmin
+      ? t("sidebar.admin")
+      : displayUser?.display_name || t("sidebar.yourWedding");
   const headerUsername =
     inAdminCenter && isAdmin
       ? "@admin"
       : displayUser?.username
         ? `@${displayUser.username}`
-        : "wedding account";
+        : t("sidebar.weddingAccount");
 
   useEffect(() => {
     let cancelled = false;
@@ -112,7 +116,7 @@ export default function Sidebar({ user }: SidebarProps) {
   }, [user, pathname, inAdminCenter, albumIdFromQuery]);
 
   return (
-    <aside className="hidden md:flex flex-col h-screen sticky top-0 w-64 border-r border-border/80 bg-white/85 backdrop-blur-sm py-6 px-4">
+    <aside className="hidden md:flex md:fixed md:left-0 md:top-0 md:bottom-0 z-30 flex-col h-screen w-64 border-r border-border/80 bg-white/85 backdrop-blur-sm py-6 px-4 overflow-y-auto hide-scrollbar">
       <div className="flex items-center gap-2 mb-6 px-2">
         <BrandLogo size="md" />
         <p className="text-lg font-semibold tracking-tight text-foreground">MemoriesBox</p>

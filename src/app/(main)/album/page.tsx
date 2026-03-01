@@ -9,6 +9,7 @@ import { getDeviceUser } from "@/lib/device-user";
 import { getActiveAlbumId, setActiveAlbumId } from "@/lib/active-album";
 import AlbumStoryRail from "@/components/album/AlbumStoryRail";
 import EmptyState from "@/components/shared/EmptyState";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 import type { Album } from "@/types/database";
 
 function dedupeAlbums(albums: Album[]) {
@@ -21,6 +22,7 @@ function dedupeAlbums(albums: Album[]) {
 }
 
 export default function AlbumHubPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedFromQuery = searchParams.get("album") || "";
@@ -132,8 +134,8 @@ export default function AlbumHubPage() {
   if (albums.length === 0) {
     return (
       <EmptyState
-        title="No album available"
-        description="Your wedding album will appear here once your planner sets it up."
+        title={t("album.noAlbumAvailable")}
+        description={t("album.noAlbumDescription")}
       />
     );
   }
@@ -143,9 +145,9 @@ export default function AlbumHubPage() {
   return (
     <div className="space-y-6 ig-reveal">
       <div className="ig-feature-card p-6">
-        <h1 className="text-2xl font-bold text-foreground">Album</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t("common.album")}</h1>
         <p className="text-sm text-muted mt-1">
-          Open your gallery, upload moments, or jump directly to sharing.
+          {t("album.hubSubtitle")}
         </p>
       </div>
 
@@ -183,7 +185,7 @@ export default function AlbumHubPage() {
                       year: "numeric",
                     })}
                     {" · "}
-                    {albumMediaCounts[album.id] || 0} uploads
+                    {albumMediaCounts[album.id] || 0} {t("album.uploads")}
                   </p>
                 </div>
               </div>
@@ -192,13 +194,13 @@ export default function AlbumHubPage() {
                   href={`/album/${album.id}`}
                   className="text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
                 >
-                  <Images className="w-3 h-3" /> Open Gallery
+                  <Images className="w-3 h-3" /> {t("album.openGallery")}
                 </Link>
                 <Link
                   href={`/share?album=${album.id}`}
                   className="text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
                 >
-                  <Share2 className="w-3 h-3" /> Share
+                  <Share2 className="w-3 h-3" /> {t("common.share")}
                 </Link>
                 <Link
                   href={`/album/${album.id}`}

@@ -4,16 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Copy, Download, ExternalLink, Loader2 } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getDeviceUser } from "@/lib/device-user";
 import { getActiveAlbumId, setActiveAlbumId } from "@/lib/active-album";
 import EmptyState from "@/components/shared/EmptyState";
 import {
-  downloadDataUrl,
   generateQRCodeFromUrl,
   getAlbumJoinPath,
 } from "@/lib/utils/qr-generate";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 import type { Album } from "@/types/database";
 
 function dedupeAlbums(albums: Album[]) {
@@ -26,6 +26,7 @@ function dedupeAlbums(albums: Album[]) {
 }
 
 export default function SharePage() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const selectedFromQuery = searchParams.get("album") || "";
 
@@ -166,10 +167,21 @@ export default function SharePage() {
     }
   };
 
-  const handleDownloadQR = () => {
-    if (!selectedAlbum || !qrDataUrl) return;
-    const safeName = selectedAlbum.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    downloadDataUrl(qrDataUrl, `${safeName || "album"}-qr.png`);
+  const handleShareLink = async () => {
+    if (!shareUrl) return;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: selectedAlbum?.name || "MemoriesBox Album",
+          text: t("share.joinAlbumText"),
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // User cancelled or share failed; fallback to copy.
+      }
+    }
+    await handleCopyLink();
   };
 
   if (loading) {
@@ -183,8 +195,8 @@ export default function SharePage() {
   if (albums.length === 0 || !selectedAlbum) {
     return (
       <EmptyState
-        title="No album to share"
-        description="Once your wedding album is ready, the permanent link and QR will appear here."
+        title={t("share.noAlbumToShare")}
+        description={t("share.noAlbumToShareDescription")}
       />
     );
   }
@@ -192,16 +204,35 @@ export default function SharePage() {
   return (
     <div className="space-y-6 ig-reveal">
       <div className="ig-feature-card p-6">
-        <h1 className="text-2xl font-bold text-foreground">Share</h1>
-        <p className="text-sm text-muted mt-1">
-          Permanent link and QR code for print cards and guest access.
-        </p>
+        <h1 className="text-2xl font-bold text-foreground">{t("common.share")}</h1>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="min-w-[106px] justify-center text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
+          >
+            <Copy className="w-3 h-3" /> {copied ? t("common.copied") : t("common.copyLink")}
+          </button>
+          <button
+            type="button"
+            onClick={handleShareLink}
+            className="min-w-[106px] justify-center text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
+          >
+            <Share2 className="w-3 h-3" /> {t("common.shareLink")}
+          </button>
+          <Link
+            href={`/album/${selectedAlbum.id}`}
+            className="min-w-[106px] justify-center text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
+          >
+            <ExternalLink className="w-3 h-3" /> {t("common.openAlbum")}
+          </Link>
+        </div>
       </div>
 
       <div className="ig-card p-4 sm:p-5 space-y-4">
         {albums.length > 1 && (
           <div>
-            <label className="block text-xs text-muted mb-1">Select album</label>
+            <label className="block text-xs text-muted mb-1">{t("share.selectAlbum")}</label>
             <select
               value={selectedAlbumId}
               onChange={(e) => setSelectedAlbumId(e.target.value)}
@@ -217,44 +248,7 @@ export default function SharePage() {
         )}
 
         <div>
-          <p className="text-sm font-semibold text-foreground">{selectedAlbum.name}</p>
-          <p className="text-xs text-muted">Join code: {selectedAlbum.join_code}</p>
-        </div>
-
-        <div className="text-xs break-all rounded-xl border border-border bg-surface/60 px-3 py-2.5">
-          {shareUrl}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
-          >
-            <Copy className="w-3 h-3" /> {copied ? "Copied" : "Copy Link"}
-          </button>
-          <button
-            type="button"
-            onClick={handleDownloadQR}
-            disabled={!qrDataUrl}
-            className="text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface disabled:opacity-50 inline-flex items-center gap-1"
-          >
-            <Download className="w-3 h-3" /> Download QR
-          </button>
-          <a
-            href={shareUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
-          >
-            <ExternalLink className="w-3 h-3" /> Open Link
-          </a>
-          <Link
-            href={`/album/${selectedAlbum.id}`}
-            className="text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
-          >
-            <ExternalLink className="w-3 h-3" /> Open Album
-          </Link>
+          <p className="text-lg font-semibold text-foreground text-center">{selectedAlbum.name}</p>
         </div>
 
         {message && <p className="text-xs text-danger">{message}</p>}
@@ -262,12 +256,13 @@ export default function SharePage() {
         {qrLoading && (
           <div className="flex items-center gap-2 text-xs text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
-            Generating QR...
+            {t("common.generatingQr")}
           </div>
         )}
 
         {qrDataUrl && (
-          <div className="ig-soft-card p-4 inline-block">
+          <div className="flex justify-center pt-1">
+            <div className="ig-soft-card p-4 inline-block">
             <Image
               src={qrDataUrl}
               alt="Album QR"
@@ -275,6 +270,7 @@ export default function SharePage() {
               height={208}
               className="w-52 h-52 bg-white border border-border rounded-lg p-2"
             />
+            </div>
           </div>
         )}
       </div>

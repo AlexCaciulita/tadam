@@ -7,8 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import GuestUploadFlow from "@/components/guest/GuestUploadFlow";
 import type { Album, MediaTask } from "@/types/database";
 import { Loader2 } from "lucide-react";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function JoinAlbumTokenPage() {
+  const { t } = useI18n();
   const params = useParams();
   const token = (params.token as string).toLowerCase();
   const [album, setAlbum] = useState<Album | null>(null);
@@ -27,7 +29,7 @@ export default function JoinAlbumTokenPage() {
         .single();
 
       if (fetchError || !data) {
-        setError("Album not found. Please check the link and try again.");
+        setError(t("join.albumNotFoundLink"));
         setLoading(false);
         return;
       }
@@ -45,7 +47,7 @@ export default function JoinAlbumTokenPage() {
     };
 
     fetchAlbum();
-  }, [token]);
+  }, [token, t]);
 
   if (loading) {
     return (
@@ -59,10 +61,10 @@ export default function JoinAlbumTokenPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white px-6">
         <div className="text-4xl mb-4">😕</div>
-        <h1 className="text-xl font-bold text-foreground mb-2">Album not found</h1>
+        <h1 className="text-xl font-bold text-foreground mb-2">{t("join.albumNotFound")}</h1>
         <p className="text-sm text-muted text-center mb-6">{error}</p>
         <Link href="/join" className="text-primary font-medium hover:underline">
-          Try joining again
+          {t("join.tryAgainLink")}
         </Link>
       </div>
     );

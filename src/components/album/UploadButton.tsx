@@ -84,7 +84,7 @@ export default function UploadButton({
       <button
         onClick={handleClick}
         className={cn(
-          "fixed bottom-20 right-4 md:bottom-6 md:right-6 w-14 h-14 ig-gradient ig-gradient-hover text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 z-30",
+          "fixed right-4 bottom-[calc(env(safe-area-inset-bottom)+84px)] md:bottom-6 md:right-6 w-14 h-14 ig-gradient ig-gradient-hover text-white rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 z-[60]",
           className
         )}
       >

@@ -6,24 +6,25 @@ import { Home, Images, Share2, User, Users, Heart, FolderOpen } from "lucide-rea
 import { cn } from "@/lib/utils/cn";
 import { useEffect, useState } from "react";
 import { getDeviceUser } from "@/lib/device-user";
-
-const navItems = [
-  { href: "/home", label: "Wedding", icon: Home },
-  { href: "/album", label: "Album", icon: Images },
-  { href: "/share", label: "Share", icon: Share2 },
-  { href: "/settings", label: "Settings", icon: User },
-];
-
-const adminNavItems = [
-  { href: "/admin?tab=profiles", label: "Profiles", icon: Users, tab: "profiles" },
-  { href: "/admin?tab=couples", label: "Couples", icon: Heart, tab: "couples" },
-  { href: "/admin?tab=albums", label: "Albums", icon: FolderOpen, tab: "albums" },
-];
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function MobileNav() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isAdmin, setIsAdmin] = useState(false);
+  const navItems = [
+    { href: "/home", label: t("sidebar.wedding"), icon: Home },
+    { href: "/album", label: t("common.album"), icon: Images },
+    { href: "/share", label: t("common.share"), icon: Share2 },
+    { href: "/settings", label: t("common.settings"), icon: User },
+  ];
+
+  const adminNavItems = [
+    { href: "/admin?tab=profiles", label: t("common.profiles"), icon: Users, tab: "profiles" },
+    { href: "/admin?tab=couples", label: t("common.couples"), icon: Heart, tab: "couples" },
+    { href: "/admin?tab=albums", label: t("common.albums"), icon: FolderOpen, tab: "albums" },
+  ];
 
   useEffect(() => {
     const init = async () => {

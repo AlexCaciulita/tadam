@@ -7,8 +7,10 @@ import BrandLogo from "@/components/shared/BrandLogo";
 import CodeInput from "@/components/shared/CodeInput";
 import QRScanner from "@/components/shared/QRScanner";
 import Button from "@/components/shared/Button";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function JoinPage() {
+  const { t } = useI18n();
   const [code, setCode] = useState("");
   const [showScanner, setShowScanner] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +19,7 @@ export default function JoinPage() {
   const handleJoin = (joinCode?: string) => {
     const finalCode = joinCode || code;
     if (finalCode.length !== 6) {
-      setError("Please enter a 6-digit code");
+      setError(t("join.enterSixDigitCode"));
       return;
     }
     setError(null);
@@ -56,7 +58,7 @@ export default function JoinPage() {
       }
     }
 
-    setError("Invalid QR code");
+    setError(t("join.invalidQr"));
   };
 
   return (
@@ -67,7 +69,7 @@ export default function JoinPage() {
           <BrandLogo size="lg" />
         </div>
         <h1 className="text-3xl font-bold text-foreground mb-2">MemoriesBox</h1>
-        <p className="text-muted">Join an album to start sharing photos</p>
+        <p className="text-muted">{t("join.title")}</p>
       </div>
 
       <div className="flex-1 flex flex-col items-center px-6 max-w-md mx-auto w-full">
@@ -83,7 +85,7 @@ export default function JoinPage() {
             {/* Code Input */}
             <div className="w-full mb-8">
               <h2 className="text-lg font-bold text-center mb-4">
-                Enter album code
+                {t("join.enterAlbumCode")}
               </h2>
               <CodeInput
                 value={code}
@@ -102,14 +104,14 @@ export default function JoinPage() {
               className="w-full max-w-xs mb-6"
               size="lg"
             >
-              Join Album
+              {t("join.joinAlbum")}
               <ArrowRight className="w-4 h-4" />
             </Button>
 
             {/* Divider */}
             <div className="flex items-center gap-4 w-full mb-6">
               <div className="flex-1 h-px bg-border" />
-              <span className="text-sm text-muted">or</span>
+              <span className="text-sm text-muted">{t("join.or")}</span>
               <div className="flex-1 h-px bg-border" />
             </div>
 
@@ -121,7 +123,7 @@ export default function JoinPage() {
               size="lg"
             >
               <QrCode className="w-5 h-5" />
-              Scan QR Code
+              {t("join.scanQr")}
             </Button>
           </>
         )}
@@ -129,9 +131,9 @@ export default function JoinPage() {
         {/* Login link */}
         <div className="mt-auto py-8 text-center">
           <p className="text-sm text-muted">
-            Have an account?{" "}
+            {t("join.haveAccount")}{" "}
             <a href="/login" className="text-primary font-medium hover:underline">
-              Sign in
+              {t("common.signIn")}
             </a>
           </p>
         </div>

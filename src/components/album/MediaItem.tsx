@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Heart, Play, X } from "lucide-react";
+import { Heart, Play } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { Media } from "@/types/database";
 
@@ -13,12 +13,16 @@ const isDemoMode = () => {
 interface MediaItemProps {
   media: Media;
   view?: "grid" | "feed" | "masonry";
+  onOpen?: () => void;
 }
 
-export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
+export default function MediaItem({
+  media,
+  view = "grid",
+  onOpen,
+}: MediaItemProps) {
   const [liked, setLiked] = useState(media.user_has_reacted || false);
   const [likeCount, setLikeCount] = useState(media.reaction_count || 0);
-  const [showFullscreen, setShowFullscreen] = useState(false);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -93,7 +97,7 @@ export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
         <article className="ig-card overflow-hidden">
           <div
             className="relative aspect-[4/5] overflow-hidden bg-surface cursor-pointer group"
-            onClick={() => setShowFullscreen(true)}
+            onClick={onOpen}
           >
             {mediaPreview}
             <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
@@ -128,7 +132,7 @@ export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
       ) : view === "masonry" ? (
         <article
           className="relative rounded-xl overflow-hidden bg-surface cursor-pointer group border border-border shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
-          onClick={() => setShowFullscreen(true)}
+          onClick={onOpen}
         >
           {media.media_type === "video" ? (
             <div className="relative aspect-[4/5]">
@@ -174,7 +178,7 @@ export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
       ) : (
         <div
           className="relative aspect-square rounded-xl overflow-hidden bg-surface cursor-pointer group border border-border shadow-[0_1px_2px_rgba(15,23,42,0.05)]"
-          onClick={() => setShowFullscreen(true)}
+          onClick={onOpen}
         >
           {mediaPreview}
 
@@ -201,54 +205,6 @@ export default function MediaItem({ media, view = "grid" }: MediaItemProps) {
                 </span>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Fullscreen lightbox */}
-      {showFullscreen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center"
-          onClick={() => setShowFullscreen(false)}
-        >
-          <button
-            onClick={() => setShowFullscreen(false)}
-            className="absolute top-4 right-4 text-white/80 hover:text-white z-10 p-2 rounded-full hover:bg-white/10 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-          {media.media_type === "video" ? (
-            <video
-              src={media.file_url}
-              className="max-w-full max-h-full"
-              controls
-              autoPlay
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <img
-              src={media.file_url}
-              alt=""
-              className="max-w-full max-h-full object-contain"
-            />
-          )}
-          {/* Bottom controls */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleLike(e);
-              }}
-              className="flex items-center gap-2 text-white bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full hover:bg-white/20 transition-colors"
-            >
-              <Heart
-                className={cn(
-                  "w-5 h-5",
-                  liked ? "fill-danger text-danger" : "text-white"
-                )}
-              />
-              <span className="text-sm">{likeCount}</span>
-            </button>
           </div>
         </div>
       )}

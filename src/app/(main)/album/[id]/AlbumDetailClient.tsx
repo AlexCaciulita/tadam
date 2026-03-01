@@ -1,19 +1,17 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import {
-  Lock,
-  CheckCircle,
-  Bookmark,
   MoreHorizontal,
-  UserPlus,
   Share2,
   Presentation,
   LayoutGrid,
   Rows3,
   GalleryVerticalEnd,
+  Download,
+  Pencil,
+  Type,
 } from "lucide-react";
-import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/shared/Button";
 import EmptyState from "@/components/shared/EmptyState";
 import Modal from "@/components/shared/Modal";
@@ -24,19 +22,19 @@ import LiveSlideshow from "@/components/album/LiveSlideshow";
 import PromptList from "@/components/prompts/PromptList";
 import CreatePrompt from "@/components/prompts/CreatePrompt";
 import { useUpload } from "@/hooks/useUpload";
+import { createClient } from "@/lib/supabase/client";
 import {
-  downloadDataUrl,
   generateQRCodeFromUrl,
   getAlbumJoinPath,
 } from "@/lib/utils/qr-generate";
-import { getDeviceId } from "@/lib/device-user";
+import { createZipBlob } from "@/lib/utils/zip";
+import { getDeviceId, getDeviceUser } from "@/lib/device-user";
 import { setActiveAlbumId } from "@/lib/active-album";
-import type { Album, AlbumMember, Media, MediaTask } from "@/types/database";
+import type { Album, Media, MediaTask } from "@/types/database";
 import type { MediaGalleryView } from "@/components/album/MediaGallery";
 
 interface AlbumDetailClientProps {
   album: Album;
-  members: AlbumMember[];
   initialMedia: Media[];
   tasks: MediaTask[];
   albumOwnerId: string;
@@ -44,7 +42,6 @@ interface AlbumDetailClientProps {
 
 export default function AlbumDetailClient({
   album,
-  members,
   initialMedia,
   tasks: initialTasks,
   albumOwnerId,
@@ -52,13 +49,23 @@ export default function AlbumDetailClient({
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [showSlideshow, setShowSlideshow] = useState(false);
-  const [showPrompts, setShowPrompts] = useState(false);
+  const [showPrompts] = useState(false);
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [tasks, setTasks] = useState<MediaTask[]>(initialTasks);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [localMedia, setLocalMedia] = useState<Media[]>([]);
   const [copied, setCopied] = useState(false);
   const [mediaView, setMediaView] = useState<MediaGalleryView>("grid");
+  const [canManageMedia, setCanManageMedia] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(album.cover_image_url || null);
+  const [albumName, setAlbumName] = useState(album.name);
+  const [renameDraft, setRenameDraft] = useState(album.name);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [downloadingImages, setDownloadingImages] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
   // Determine ownership client-side via device ID.
   const isOwner = getDeviceId() === albumOwnerId;
@@ -67,6 +74,38 @@ export default function AlbumDetailClient({
   useEffect(() => {
     setActiveAlbumId(album.id);
   }, [album.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const resolvePermissions = async () => {
+      try {
+        const user = await getDeviceUser();
+        const canManage = user.role === "platform_admin";
+        if (!cancelled) setCanManageMedia(canManage);
+      } catch {
+        if (!cancelled) setCanManageMedia(false);
+      }
+    };
+
+    resolvePermissions();
+    return () => {
+      cancelled = true;
+    };
+  }, [albumOwnerId]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!showMoreMenu) return;
+      if (moreMenuRef.current?.contains(event.target as Node)) return;
+      setShowMoreMenu(false);
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, [showMoreMenu]);
 
   const handleUploadComplete = useCallback((media: Media) => {
     setLocalMedia((prev) => {
@@ -122,8 +161,8 @@ export default function AlbumDetailClient({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: album.name,
-          text: `Join my album "${album.name}" on MemoriesBox!`,
+          title: albumName,
+          text: `Join my album "${albumName}" on MemoriesBox!`,
           url: joinUrl,
         });
       } catch {
@@ -135,17 +174,149 @@ export default function AlbumDetailClient({
     }
   };
 
-  const handleDownloadQR = () => {
-    if (!qrDataUrl) return;
-    const safeName = album.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    downloadDataUrl(qrDataUrl, `${safeName || "album"}-qr.png`);
+  const handleDeleteMedia = useCallback(async (media: Media) => {
+    const response = await fetch(`/api/media/${media.id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json().catch(() => ({}))) as { error?: string };
+      throw new Error(payload.error || "Failed to delete media");
+    }
+  }, []);
+
+  const handleHeroUploadClick = () => {
+    coverInputRef.current?.click();
+  };
+
+  const handleRenameAlbum = async () => {
+    if (!canManageMedia || renaming) return;
+    const nextName = renameDraft.trim();
+    if (!nextName || nextName === albumName) {
+      setShowRenameModal(false);
+      return;
+    }
+
+    setRenaming(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("albums")
+        .update({ name: nextName })
+        .eq("id", album.id);
+      if (error) throw error;
+      setAlbumName(nextName);
+      setRenameDraft(nextName);
+      setShowRenameModal(false);
+    } catch (error) {
+      console.error("Failed to rename album", error);
+      window.alert("Failed to rename album.");
+    } finally {
+      setRenaming(false);
+    }
+  };
+
+  const handleHeroImageSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !canManageMedia) return;
+
+    event.target.value = "";
+
+    if (!file.type.startsWith("image/")) {
+      window.alert("Please select an image file.");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("albumId", album.id);
+      formData.append("file", file, file.name);
+
+      const uploadResponse = await fetch("/api/uploads/r2/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        const payload = (await uploadResponse.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Failed to upload hero image");
+      }
+
+      const { fileUrl } = (await uploadResponse.json()) as { fileUrl: string };
+
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("albums")
+        .update({ cover_image_url: fileUrl })
+        .eq("id", album.id);
+
+      if (updateError) throw updateError;
+
+      setCoverImageUrl(fileUrl);
+    } catch (error) {
+      console.error("Failed to update hero image", error);
+      const message =
+        error instanceof Error && error.message ? error.message : "Failed to update hero image";
+      window.alert(message);
+    }
+  };
+
+  const handleDownloadImages = async () => {
+    if (downloadingImages) return;
+    setShowMoreMenu(false);
+
+    const imageMedia = allMedia.filter((item) => item.media_type === "photo");
+    if (imageMedia.length === 0) {
+      window.alert("No images found in this album.");
+      return;
+    }
+
+    setDownloadingImages(true);
+    try {
+      const files = await Promise.all(
+        imageMedia.map(async (item, index) => {
+          const response = await fetch(item.file_url);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image ${index + 1}`);
+          }
+
+          const buffer = await response.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          const urlPath = item.file_url.split("?")[0] || "";
+          const extMatch = urlPath.match(/\.([a-zA-Z0-9]+)$/);
+          const ext = (extMatch?.[1] || "jpg").toLowerCase();
+          const fileName = `image-${String(index + 1).padStart(3, "0")}.${ext}`;
+          return { name: fileName, data: bytes };
+        })
+      );
+
+      const zipBlob = createZipBlob(files);
+      const safeAlbum = albumName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      const zipName = `${safeAlbum || "album"}-images.zip`;
+
+      const url = URL.createObjectURL(zipBlob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = zipName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to download images ZIP", error);
+      window.alert("Failed to prepare ZIP download.");
+    } finally {
+      setDownloadingImages(false);
+    }
   };
 
   return (
-    <div className="space-y-0 ig-reveal">
+    <div className="space-y-0">
       {/* Action bar */}
       <div className="flex items-center justify-end gap-2 mb-4">
-        <UploadButton onFilesSelected={handleFilesSelected} variant="icon" />
+        {!lightboxOpen && (
+          <UploadButton onFilesSelected={handleFilesSelected} variant="icon" />
+        )}
         <button
           onClick={handleShowQR}
           className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
@@ -153,17 +324,7 @@ export default function AlbumDetailClient({
         >
           <Share2 className="w-5 h-5 text-foreground" />
         </button>
-        <button
-          onClick={() => setShowPrompts(!showPrompts)}
-          className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
-          title="Media Tasks"
-        >
-          <CheckCircle className="w-5 h-5 text-foreground" />
-        </button>
-        <button className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors">
-          <Bookmark className="w-5 h-5 text-foreground" />
-        </button>
-        <div className="relative">
+        <div ref={moreMenuRef} className="relative">
           <button
             onClick={() => setShowMoreMenu(!showMoreMenu)}
             className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
@@ -189,45 +350,69 @@ export default function AlbumDetailClient({
                 <Presentation className="w-4 h-4" />
                 Live Slideshow
               </button>
+              <button
+                onClick={handleDownloadImages}
+                disabled={downloadingImages}
+                className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" />
+                {downloadingImages ? "Preparing ZIP..." : "Download images"}
+              </button>
+              {canManageMedia && (
+                <>
+                  <button
+                    onClick={() => {
+                      setRenameDraft(albumName);
+                      setShowRenameModal(true);
+                      setShowMoreMenu(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left"
+                  >
+                    <Type className="w-4 h-4" />
+                    Rename Album
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleHeroUploadClick();
+                      setShowMoreMenu(false);
+                    }}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left"
+                  >
+                    <Pencil className="w-4 h-4" />
+                    Change Album Image
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Album header */}
-      <div className="ig-feature-card p-6 mb-6">
-        <div className="flex items-center gap-2 mb-1">
-          {album.is_private && <Lock className="w-4 h-4 text-muted" />}
-          <h1 className="text-xl font-bold text-foreground">{album.name}</h1>
-        </div>
-        <p className="text-sm text-muted">
-          {new Date(album.created_at).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })}
-        </p>
-
-        {/* Members row */}
-        <div className="flex items-center gap-2 mt-3">
-          <button className="flex items-center gap-1 text-muted hover:text-foreground transition-colors">
-            <UserPlus className="w-5 h-5" />
-          </button>
-          <div className="flex -space-x-2">
-            {members.slice(0, 5).map((member) => (
-              <Avatar
-                key={member.id}
-                src={member.profile?.avatar_url}
-                size="sm"
-                className="border-2 border-white"
-              />
-            ))}
-          </div>
-          {members.length > 5 && (
-            <span className="text-xs text-muted">+{members.length - 5}</span>
+      {/* Album hero card */}
+      <div className="ig-feature-card mb-6 overflow-hidden">
+        <div className="relative h-44 sm:h-56 bg-surface">
+          {coverImageUrl ? (
+            <img src={coverImageUrl} alt={album.name} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-primary-light via-white to-surface" />
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 w-full px-4">
+            <h1 className="text-center text-xl sm:text-2xl font-bold text-white drop-shadow">
+              {albumName}
+            </h1>
+          </div>
         </div>
       </div>
+
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleHeroImageSelected}
+      />
 
       {/* Media section header + view toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -297,7 +482,14 @@ export default function AlbumDetailClient({
       )}
 
       {allMedia.length > 0 ? (
-        <MediaGallery albumId={album.id} initialMedia={allMedia} view={mediaView} />
+        <MediaGallery
+          albumId={album.id}
+          initialMedia={allMedia}
+          view={mediaView}
+          canDelete={canManageMedia}
+          onDeleteMedia={handleDeleteMedia}
+          onLightboxOpenChange={setLightboxOpen}
+        />
       ) : (
         <EmptyState
           title="Let's start sharing memories"
@@ -317,7 +509,7 @@ export default function AlbumDetailClient({
       )}
 
       {/* FAB for mobile upload */}
-      <UploadButton onFilesSelected={handleFilesSelected} variant="fab" />
+      {!lightboxOpen && <UploadButton onFilesSelected={handleFilesSelected} variant="fab" />}
 
       {/* Upload progress */}
       <UploadProgress
@@ -328,53 +520,56 @@ export default function AlbumDetailClient({
 
       {/* QR Code Modal */}
       <Modal isOpen={showQR} onClose={() => setShowQR(false)} title="Share Album">
-        <div className="text-center">
-          {qrDataUrl && (
-            <img src={qrDataUrl} alt="QR Code" className="mx-auto mb-4 w-48 h-48" />
-          )}
-          <div className="bg-surface rounded-lg p-4 mb-4">
-            <p className="text-sm text-muted mb-1">Join Code</p>
-            <p className="text-2xl font-bold tracking-widest text-primary">
-              {album.join_code}
-            </p>
-          </div>
-
-          {/* Copyable link */}
-          <div className="bg-surface rounded-lg p-3 mb-4">
-            <p className="text-xs text-muted mb-1.5">Share link</p>
-            <div className="flex items-center gap-2">
-              <p className="text-sm text-foreground truncate flex-1 text-left font-mono">
-                {joinUrl}
-              </p>
-              <button
-                onClick={handleCopyLink}
-                className="text-xs font-medium text-primary hover:text-primary/80 whitespace-nowrap px-2 py-1 rounded bg-primary/10 transition-colors"
-              >
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
-          </div>
-
-          {/* Share + Copy buttons */}
-          <div className="flex gap-3">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-full flex items-center justify-center gap-2">
             <Button
               variant="outline"
-              className="flex-1"
-              onClick={handleDownloadQR}
-              disabled={!qrDataUrl}
-            >
-              Download QR
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
+              className="min-w-[128px] justify-center"
               onClick={handleCopyLink}
             >
               {copied ? "Copied!" : "Copy Link"}
             </Button>
-            <Button className="flex-1" onClick={handleNativeShare}>
+            <Button
+              variant="outline"
+              className="min-w-[128px] justify-center"
+              onClick={handleNativeShare}
+            >
               <Share2 className="w-4 h-4" />
-              Share
+              Share Link
+            </Button>
+          </div>
+          {qrDataUrl ? (
+            <img src={qrDataUrl} alt="QR Code" className="w-52 h-52 max-w-full" />
+          ) : (
+            <p className="text-sm text-muted">Generating QR...</p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showRenameModal}
+        onClose={() => setShowRenameModal(false)}
+        title="Rename Album"
+      >
+        <div className="space-y-3">
+          <label className="block text-sm text-muted">Album name</label>
+          <input
+            value={renameDraft}
+            onChange={(e) => setRenameDraft(e.target.value)}
+            placeholder="Album name"
+            className="w-full px-3 py-2 rounded-lg border border-border text-sm"
+            maxLength={120}
+          />
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowRenameModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleRenameAlbum} isLoading={renaming}>
+              Save
             </Button>
           </div>
         </div>
@@ -400,7 +595,7 @@ export default function AlbumDetailClient({
         <LiveSlideshow
           albumId={album.id}
           initialMedia={allMedia}
-          albumName={album.name}
+          albumName={albumName}
           onClose={() => setShowSlideshow(false)}
         />
       )}

@@ -7,10 +7,11 @@ import Button from "@/components/shared/Button";
 import { getDeviceUser, clearDeviceUserCache } from "@/lib/device-user";
 import { createClient } from "@/lib/supabase/client";
 import { getActiveAlbumId } from "@/lib/active-album";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const [displayName, setDisplayName] = useState("");
-  const [username, setUsername] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -53,7 +54,6 @@ export default function SettingsPage() {
 
         setDeviceId(targetProfile.id);
         setDisplayName(targetProfile.display_name || "");
-        setUsername(targetProfile.username || "");
         setAvatarUrl(targetProfile.avatar_url || null);
       } catch (err) {
         console.error("Failed to fetch profile:", err);
@@ -80,7 +80,6 @@ export default function SettingsPage() {
         .from("profiles")
         .update({
           display_name: displayName.trim() || null,
-          username: username.trim(),
         })
         .eq("id", deviceId);
 
@@ -185,8 +184,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 ig-reveal">
       <div className="ig-feature-card p-6">
-        <h1 className="text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted mt-1">Manage your profile and wedding account details.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t("settings.title")}</h1>
+        <p className="text-sm text-muted mt-1">{t("settings.subtitle")}</p>
       </div>
 
       <div className="ig-card p-6">
@@ -214,7 +213,7 @@ export default function SettingsPage() {
             onClick={handleAvatarClick}
             isLoading={avatarUploading}
           >
-            Edit avatar
+            {t("common.editAvatar")}
           </Button>
         </div>
       </div>
@@ -222,7 +221,7 @@ export default function SettingsPage() {
       <form onSubmit={handleSave} className="ig-card p-5 sm:p-6 space-y-4 max-w-xl">
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
-            Display name
+            {t("common.displayName")}
           </label>
           <input
             type="text"
@@ -233,24 +232,9 @@ export default function SettingsPage() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
-            Username
-          </label>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) =>
-              setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))
-            }
-            placeholder="username"
-            className="w-full px-4 py-2.5 rounded-xl border border-border bg-white text-sm focus:border-primary focus:ring-2 focus:ring-primary/10 outline-none"
-          />
-        </div>
-
         {success && (
           <p className="text-sm text-success bg-success/10 px-3 py-2 rounded-lg">
-            Profile updated successfully!
+            {t("settings.profileUpdated")}
           </p>
         )}
 
@@ -260,9 +244,7 @@ export default function SettingsPage() {
           </p>
         )}
 
-        <Button type="submit" isLoading={loading} className="w-full">
-          Save changes
-        </Button>
+        <Button type="submit" isLoading={loading} className="w-full">{t("common.saveChanges")}</Button>
       </form>
     </div>
   );

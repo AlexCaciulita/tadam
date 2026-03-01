@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { CalendarDays, FolderOpen, Images, Loader2, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getDeviceUser } from "@/lib/device-user";
@@ -9,6 +9,7 @@ import { getActiveAlbumId, setActiveAlbumId } from "@/lib/active-album";
 import AlbumGrid from "@/components/album/AlbumGrid";
 import AlbumStoryRail from "@/components/album/AlbumStoryRail";
 import EmptyState from "@/components/shared/EmptyState";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 import type { Album, Media, Profile } from "@/types/database";
 
 function dedupeAlbums(albums: Album[]) {
@@ -21,6 +22,7 @@ function dedupeAlbums(albums: Album[]) {
 }
 
 export default function HomePage() {
+  const { t } = useI18n();
   const [albums, setAlbums] = useState<Album[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [recentMedia, setRecentMedia] = useState<Media[]>([]);
@@ -131,14 +133,6 @@ export default function HomePage() {
     fetchData();
   }, []);
 
-  const albumNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const album of albums) {
-      map.set(album.id, album.name);
-    }
-    return map;
-  }, [albums]);
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -148,18 +142,18 @@ export default function HomePage() {
   }
 
   return (
-    <div className="space-y-6 ig-reveal">
-      <section className="ig-feature-card p-6">
+    <div className="space-y-4 sm:space-y-6 ig-reveal">
+      <section className="ig-feature-card p-6 hidden sm:block">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">
-              {profile?.display_name || "My Wedding"}
+              {profile?.display_name || t("sidebar.myWedding")}
             </h1>
             <p className="text-primary text-sm font-medium mt-1">
-              {profile?.username ? `@${profile.username}` : "Wedding dashboard"}
+              {profile?.username ? `@${profile.username}` : t("home.weddingDashboard")}
             </p>
             <p className="text-sm text-muted mt-2">
-              Capture every table, dance, toast, and candid moment.
+              {t("home.captureLine")}
             </p>
           </div>
           <div className="flex gap-2">
@@ -168,59 +162,102 @@ export default function HomePage() {
               className="text-xs sm:text-sm px-3.5 py-2 rounded-xl border border-border bg-white hover:bg-surface inline-flex items-center gap-2"
             >
               <Images className="w-4 h-4" />
-              Open Album
+              {t("common.openAlbum")}
             </Link>
             <Link
               href="/share"
               className="text-xs sm:text-sm px-3.5 py-2 rounded-xl ig-gradient ig-gradient-hover text-white inline-flex items-center gap-2 shadow-sm"
             >
               <Share2 className="w-4 h-4" />
-              Share
+              {t("common.share")}
             </Link>
           </div>
         </div>
       </section>
 
       {albums.length > 0 && (
-        <AlbumStoryRail albums={albums} activeAlbumId={albums[0]?.id} />
+        <div className="space-y-2 sm:space-y-3">
+          <AlbumStoryRail
+            albums={albums}
+            activeAlbumId={albums[0]?.id}
+            overrideImageUrl={profile?.avatar_url || null}
+          />
+          <div className="sm:hidden grid grid-cols-2 gap-2">
+            <Link
+              href="/album"
+              className="text-xs px-3 py-2 rounded-lg border border-border bg-white hover:bg-surface inline-flex items-center justify-center gap-1.5"
+            >
+              <Images className="w-3.5 h-3.5" />
+              {t("common.openAlbum")}
+            </Link>
+            <Link
+              href="/share"
+              className="text-xs px-3 py-2 rounded-lg ig-gradient ig-gradient-hover text-white inline-flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              {t("common.share")}
+            </Link>
+          </div>
+        </div>
       )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="ig-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted">Albums</p>
-            <FolderOpen className="w-4 h-4 text-muted" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{albums.length}</p>
-        </div>
-        <div className="ig-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted">Total Uploads</p>
-            <Images className="w-4 h-4 text-muted" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{mediaCount}</p>
-        </div>
-        <div className="ig-card p-4">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-muted">Last 7 Days</p>
-            <CalendarDays className="w-4 h-4 text-muted" />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{uploadsThisWeek}</p>
-        </div>
-      </div>
 
       {albums.length > 0 ? (
         <>
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">My Albums</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">{t("home.myAlbums")}</h2>
             <AlbumGrid albums={albums} />
           </section>
 
+          {/* Compact mobile stats */}
+          <section className="sm:hidden">
+            <div className="ig-card p-3">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-surface/70 p-2.5 text-center">
+                  <p className="text-[11px] text-muted">{t("common.albums")}</p>
+                  <p className="text-lg font-bold text-foreground">{albums.length}</p>
+                </div>
+                <div className="rounded-xl bg-surface/70 p-2.5 text-center">
+                  <p className="text-[11px] text-muted">Uploads</p>
+                  <p className="text-lg font-bold text-foreground">{mediaCount}</p>
+                </div>
+                <div className="rounded-xl bg-surface/70 p-2.5 text-center">
+                  <p className="text-[11px] text-muted">{t("home.days7Short")}</p>
+                  <p className="text-lg font-bold text-foreground">{uploadsThisWeek}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Desktop/tablet stats */}
+          <div className="hidden sm:grid grid-cols-3 gap-4">
+            <div className="ig-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted">{t("common.albums")}</p>
+                <FolderOpen className="w-4 h-4 text-muted" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{albums.length}</p>
+            </div>
+            <div className="ig-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted">{t("home.totalUploads")}</p>
+                <Images className="w-4 h-4 text-muted" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{mediaCount}</p>
+            </div>
+            <div className="ig-card p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm text-muted">{t("home.last7Days")}</p>
+                <CalendarDays className="w-4 h-4 text-muted" />
+              </div>
+              <p className="text-2xl font-bold text-foreground">{uploadsThisWeek}</p>
+            </div>
+          </div>
+
           <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">Recent Uploads</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-3">{t("home.recentUploads")}</h2>
             {recentMedia.length > 0 ? (
               <div className="space-y-3">
-                {recentMedia.map((item) => (
+                {recentMedia.slice(0, 8).map((item) => (
                   <Link
                     key={item.id}
                     href={`/album/${item.album_id}`}
@@ -234,9 +271,6 @@ export default function HomePage() {
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {albumNameById.get(item.album_id) || "Album"}
-                      </p>
                       <p className="text-xs text-muted">
                         {new Date(item.created_at).toLocaleString("en-US", {
                           month: "short",
@@ -251,7 +285,7 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="ig-card p-4">
-                <p className="text-sm text-muted">No uploads yet.</p>
+                <p className="text-sm text-muted">{t("common.noUploadsYet")}</p>
               </div>
             )}
           </section>

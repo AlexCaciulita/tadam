@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Button from "@/components/shared/Button";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function RegisterPage() {
+  const { t } = useI18n();
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,7 +23,7 @@ export default function RegisterPage() {
     setError(null);
 
     if (username.length < 3) {
-      setError("Username must be at least 3 characters");
+      setError(t("auth.usernameMinLength"));
       setLoading(false);
       return;
     }
@@ -36,7 +38,7 @@ export default function RegisterPage() {
       .single();
 
     if (existingUser) {
-      setError("Username already taken");
+      setError(t("auth.usernameTaken"));
       setLoading(false);
       return;
     }
@@ -64,12 +66,12 @@ export default function RegisterPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-bold text-foreground mb-6">Create account</h2>
+      <h2 className="text-xl font-bold text-foreground mb-6">{t("auth.createAccount")}</h2>
 
       <form onSubmit={handleRegister} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
-            Username
+            {t("common.username")}
           </label>
           <input
             type="text"
@@ -83,7 +85,7 @@ export default function RegisterPage() {
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
-            Display name
+            {t("common.displayName")}
           </label>
           <input
             type="text"
@@ -96,7 +98,7 @@ export default function RegisterPage() {
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
-            Email
+            {t("common.email")}
           </label>
           <input
             type="email"
@@ -110,7 +112,7 @@ export default function RegisterPage() {
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1.5">
-            Password
+            {t("common.password")}
           </label>
           <input
             type="password"
@@ -130,14 +132,14 @@ export default function RegisterPage() {
         )}
 
         <Button type="submit" isLoading={loading} className="w-full">
-          Create account
+          {t("auth.createAccount")}
         </Button>
       </form>
 
       <p className="text-center text-sm text-muted mt-6">
-        Already have an account?{" "}
+        {t("auth.haveAccount")}{" "}
         <Link href="/login" className="text-primary hover:underline font-medium">
-          Sign in
+          {t("common.signIn")}
         </Link>
       </p>
     </div>

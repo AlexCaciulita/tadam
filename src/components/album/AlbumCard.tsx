@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ImagePlus, Lock } from "lucide-react";
-import Avatar from "@/components/shared/Avatar";
+import { ImagePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils/cn";
 import type { Album } from "@/types/database";
@@ -54,29 +53,7 @@ export default function AlbumCard({ album, className }: AlbumCardProps) {
   return (
     <Link href={`/album/${album.id}`} className={cn("group block", className)}>
       <article className="ig-card overflow-hidden transition-transform group-hover:scale-[1.01]">
-        <div className="flex items-center justify-between p-3.5 border-b border-border">
-          <div className="flex items-center gap-2 min-w-0">
-            <Avatar src={album.owner?.avatar_url} size="sm" />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground truncate">{album.name}</p>
-              <p className="text-xs text-muted">
-                {new Date(album.created_at).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-          </div>
-          {album.is_private && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-surface px-2 py-1 text-[11px] text-muted">
-              <Lock className="w-3 h-3" />
-              Private
-            </span>
-          )}
-        </div>
-
-        <div className="aspect-square relative bg-surface">
+        <div className="aspect-[4/3] md:aspect-square relative bg-surface">
           {previewUrl ? (
             <img
               src={previewUrl}
@@ -91,13 +68,13 @@ export default function AlbumCard({ album, className }: AlbumCardProps) {
               <span className="text-sm text-muted font-medium">Waiting for first upload</span>
             </div>
           )}
-        </div>
 
-        <div className="flex items-center justify-between p-3">
-          <p className="text-xs text-muted">Open album</p>
-          <p className="text-xs font-semibold text-primary group-hover:text-primary-hover">
-            View
-          </p>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent" />
+          <div className="absolute bottom-2.5 left-2.5 right-2.5">
+            <p className="text-sm md:text-base font-semibold text-white truncate drop-shadow">
+              {album.name}
+            </p>
+          </div>
         </div>
       </article>
     </Link>

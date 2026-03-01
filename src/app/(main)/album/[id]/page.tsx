@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AlbumDetailClient from "./AlbumDetailClient";
-import type { Album, AlbumMember, Media, MediaTask } from "@/types/database";
+import type { Album, Media, MediaTask } from "@/types/database";
 
 interface AlbumPageProps {
   params: Promise<{ id: string }>;
@@ -22,14 +22,6 @@ export default async function AlbumPage({ params }: AlbumPageProps) {
   if (albumError || !album) {
     notFound();
   }
-
-  // Fetch members with profiles
-  const { data: membersData } = await supabase
-    .from("album_members")
-    .select("*, profile:profiles(*)")
-    .eq("album_id", id);
-
-  const members = (membersData || []) as AlbumMember[];
 
   // Fetch media
   const { data: mediaData } = await supabase
@@ -53,7 +45,6 @@ export default async function AlbumPage({ params }: AlbumPageProps) {
   return (
     <AlbumDetailClient
       album={album as Album}
-      members={members}
       initialMedia={media}
       tasks={tasks}
       albumOwnerId={album.owner_id}

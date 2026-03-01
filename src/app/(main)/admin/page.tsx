@@ -9,6 +9,7 @@ import {
   Download,
   ExternalLink,
   Loader2,
+  LogIn,
   PlusCircle,
   RefreshCw,
   ShieldAlert,
@@ -66,6 +67,7 @@ export default function AdminPage() {
 
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
+  const [requiresAuth, setRequiresAuth] = useState(false);
   const [adminId, setAdminId] = useState<string | null>(null);
   const [data, setData] = useState<AdminOverview | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<string | null>(null);
@@ -74,7 +76,6 @@ export default function AdminPage() {
   const [refreshTick, setRefreshTick] = useState(0);
 
   const [clientUsername, setClientUsername] = useState("");
-  const [clientDisplayName, setClientDisplayName] = useState("");
   const [albumName, setAlbumName] = useState("");
   const [weddingDate, setWeddingDate] = useState("");
   const [description, setDescription] = useState("");
@@ -108,6 +109,17 @@ export default function AdminPage() {
       setMessage(null);
 
       try {
+        const supabase = createClient();
+        const { data: authData } = await supabase.auth.getUser();
+        const authUser = authData.user;
+        if (!authUser) {
+          setRequiresAuth(true);
+          setAllowed(false);
+          setLoading(false);
+          return;
+        }
+
+        setRequiresAuth(false);
         const deviceUser = await getDeviceUser();
 
         if (deviceUser.role !== "platform_admin") {
@@ -118,8 +130,6 @@ export default function AdminPage() {
 
         setAllowed(true);
         setAdminId(deviceUser.id);
-
-        const supabase = createClient();
 
         const [profilesCountRes, albumsCountRes, profilesRes, albumsRes, mediaRes] =
           await Promise.all([
@@ -443,7 +453,7 @@ export default function AdminPage() {
         .insert({
           id: ownerId,
           username: normalizedUsername,
-          display_name: clientDisplayName.trim() || normalizedUsername,
+          display_name: normalizedUsername,
           role: "user",
         })
         .select("*")
@@ -525,7 +535,6 @@ export default function AdminPage() {
           : "Wedding workspace created. QR generation failed; use the link or regenerate from Albums > Share."
       );
       setClientUsername("");
-      setClientDisplayName("");
       setAlbumName("");
       setWeddingDate("");
       setDescription("");
@@ -562,6 +571,25 @@ export default function AdminPage() {
   }
 
   if (!allowed) {
+    if (requiresAuth) {
+      return (
+        <div className="max-w-xl mx-auto py-14 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
+            <LogIn className="w-6 h-6 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Sign in required</h1>
+          <p className="text-muted mb-6">Please sign in to access the admin center.</p>
+          <Link
+            href="/login?next=/admin"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm hover:bg-primary/90 transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            Sign in
+          </Link>
+        </div>
+      );
+    }
+
     return (
       <div className="max-w-xl mx-auto py-14 text-center">
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-danger/10 mb-4">
@@ -578,12 +606,10 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="sticky top-0 z-20 -mx-4 md:-mx-6 px-4 md:px-6 py-3 bg-background/95 backdrop-blur border-b border-border/70">
+        <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Admin Dashboard</h1>
-          <p className="text-sm text-muted mt-1">
-            Create a wedding workspace with permanent link and QR in one step.
-          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -607,6 +633,7 @@ export default function AdminPage() {
             </span>
           </button>
         </div>
+        </div>
       </div>
 
       {message && (
@@ -624,15 +651,6 @@ export default function AdminPage() {
                 placeholder="anna_mihai"
                 className="w-full px-3 py-2 rounded-lg border border-border text-sm"
                 required
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-muted mb-1">Client display name</label>
-              <input
-                value={clientDisplayName}
-                onChange={(e) => setClientDisplayName(e.target.value)}
-                placeholder="Anna & Mihai"
-                className="w-full px-3 py-2 rounded-lg border border-border text-sm"
               />
             </div>
             <div>

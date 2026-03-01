@@ -1,10 +1,15 @@
+"use client";
+
 import BrandLogo from "@/components/shared/BrandLogo";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-4">
       <div className="w-full max-w-md">
@@ -14,7 +19,7 @@ export default function AuthLayout({
             <BrandLogo size="lg" />
           </div>
           <h1 className="text-3xl font-bold text-foreground">MemoriesBox</h1>
-          <p className="text-sm text-muted mt-1">Share moments together</p>
+          <p className="text-sm text-muted mt-1">{t("auth.tagline")}</p>
         </div>
 
         {/* Auth Card */}

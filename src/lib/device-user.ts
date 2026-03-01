@@ -30,32 +30,65 @@ export function getDeviceId(): string {
 export async function getDeviceUser(): Promise<Profile> {
   if (cachedUser) return cachedUser;
 
-  const id = getDeviceId();
-  const shortId = id.slice(0, 8);
   const supabase = createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const authUser = authData.user;
+  const id = authUser?.id || getDeviceId();
+  const shortId = id.slice(0, 8);
 
-  // Upsert — creates if missing, returns existing if found
+  const sanitizeUsername = (value: string) =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 30);
+
+  const emailUsername = authUser?.email?.split("@")[0] || "";
+  const metadataUsername =
+    typeof authUser?.user_metadata?.username === "string"
+      ? authUser.user_metadata.username
+      : "";
+  const metadataDisplayName =
+    typeof authUser?.user_metadata?.display_name === "string"
+      ? authUser.user_metadata.display_name
+      : "";
+
+  const derivedUsername =
+    sanitizeUsername(metadataUsername) ||
+    sanitizeUsername(emailUsername) ||
+    `user_${shortId}`;
+  const derivedDisplayName = metadataDisplayName || derivedUsername || `User ${shortId}`;
+
+  // Try existing profile first to avoid overwriting role or display data.
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (existingProfile) {
+    cachedUser = existingProfile as Profile;
+    return cachedUser;
+  }
+
+  // Insert profile if missing.
   const { data, error } = await supabase
     .from("profiles")
-    .upsert(
-      {
-        id,
-        username: `user_${shortId}`,
-        display_name: `User ${shortId}`,
-        role: "user",
-      },
-      { onConflict: "id", ignoreDuplicates: true }
-    )
+    .insert({
+      id,
+      username: derivedUsername,
+      display_name: derivedDisplayName,
+      role: "user",
+    })
     .select()
-    .single();
+    .maybeSingle();
 
   if (data) {
     cachedUser = data as Profile;
     return cachedUser;
   }
 
-  // If upsert didn't return data (ignoreDuplicates=true skips returning),
-  // fetch the existing row
   if (error || !data) {
     const { data: existing } = await supabase
       .from("profiles")
@@ -72,8 +105,8 @@ export async function getDeviceUser(): Promise<Profile> {
   // Final fallback: return synthetic profile (won't be in DB)
   cachedUser = {
     id,
-    username: `user_${shortId}`,
-    display_name: `User ${shortId}`,
+    username: derivedUsername,
+    display_name: derivedDisplayName,
     avatar_url: null,
     role: "user",
     created_at: new Date().toISOString(),

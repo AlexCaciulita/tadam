@@ -125,3 +125,90 @@ export async function createUploadUrl(options: {
     fileUrl: buildPublicFileUrl(options.objectKey),
   };
 }
+
+async function createSignedObjectUrl(options: {
+  objectKey: string;
+  method: "PUT" | "DELETE";
+  expiresInSeconds?: number;
+}) {
+  const bucket = getRequiredEnv("CLOUDFLARE_R2_BUCKET", R2_BUCKET);
+  const { endpoint, accessKeyId, secretAccessKey } = getR2Client();
+  const expires = options.expiresInSeconds ?? 60;
+  const service = "s3";
+  const region = "auto";
+  const now = new Date();
+  const isoDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = isoDate.slice(0, 8);
+  const host = new URL(endpoint).host;
+
+  const encodedKey = options.objectKey
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const canonicalUri = `/${bucket}/${encodedKey}`;
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const queryParams = new URLSearchParams({
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${accessKeyId}/${credentialScope}`,
+    "X-Amz-Date": isoDate,
+    "X-Amz-Expires": String(expires),
+    "X-Amz-SignedHeaders": "host",
+  });
+
+  const canonicalQuery = [...queryParams.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+    )
+    .join("&");
+
+  const canonicalHeaders = `host:${host}\n`;
+  const canonicalRequest = [
+    options.method,
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    "host",
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+
+  const hashedCanonicalRequest = crypto
+    .createHash("sha256")
+    .update(canonicalRequest)
+    .digest("hex");
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    isoDate,
+    credentialScope,
+    hashedCanonicalRequest,
+  ].join("\n");
+
+  const hmac = (key: Buffer | string, data: string) =>
+    crypto.createHmac("sha256", key).update(data).digest();
+  const kDate = hmac(`AWS4${secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, "aws4_request");
+  const signature = crypto
+    .createHmac("sha256", kSigning)
+    .update(stringToSign)
+    .digest("hex");
+
+  return `${endpoint}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+export async function deleteObject(objectKey: string) {
+  const deleteUrl = await createSignedObjectUrl({
+    objectKey,
+    method: "DELETE",
+    expiresInSeconds: 90,
+  });
+
+  const response = await fetch(deleteUrl, { method: "DELETE" });
+  if (!response.ok && response.status !== 404) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`R2 delete failed (${response.status}): ${body}`);
+  }
+}

@@ -7,6 +7,7 @@ import MobileNav from "@/components/layout/MobileNav";
 import NotificationPanel from "@/components/layout/NotificationPanel";
 import BrandLogo from "@/components/shared/BrandLogo";
 import { getDeviceUser } from "@/lib/device-user";
+import { useI18n } from "@/lib/i18n/LanguageProvider";
 import type { Profile, Notification } from "@/types/database";
 
 interface MainLayoutClientProps {
@@ -20,6 +21,7 @@ export default function MainLayoutClient({
   notifications,
   children,
 }: MainLayoutClientProps) {
+  const { t } = useI18n();
   const [user, setUser] = useState<Profile | null>(initialUser);
   const [loading, setLoading] = useState(!initialUser);
 
@@ -49,7 +51,7 @@ export default function MainLayoutClient({
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          <p className="text-sm text-muted">Loading...</p>
+          <p className="text-sm text-muted">{t("common.loading")}</p>
         </div>
       </div>
     );
@@ -62,7 +64,7 @@ export default function MainLayoutClient({
         <Sidebar user={user} />
 
         {/* Main Content */}
-        <main className="flex-1 min-h-screen pb-20 md:pb-0">
+        <main className="flex-1 min-h-screen pb-20 md:pb-0 md:ml-64">
           <div className="max-w-4xl mx-auto px-4 md:px-6 py-5 md:py-8">
             <header className="md:hidden mb-5 px-1 flex items-center justify-between">
               <div className="flex items-center gap-2">
