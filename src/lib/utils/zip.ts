@@ -52,6 +52,12 @@ function concatUint8(chunks: Uint8Array[]) {
   return out;
 }
 
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(data.length);
+  copy.set(data);
+  return copy.buffer;
+}
+
 export type ZipFileInput = {
   name: string;
   data: Uint8Array;
@@ -123,7 +129,13 @@ export function createZipBlob(files: ZipFileInput[]) {
   writeUint32(endView, 16, offset);
   writeUint16(endView, 20, 0);
 
-  return new Blob([...localParts, centralData, endRecord], {
+  const blobParts: BlobPart[] = [
+    ...localParts.map((part) => toArrayBuffer(part)),
+    toArrayBuffer(centralData),
+    toArrayBuffer(endRecord),
+  ];
+
+  return new Blob(blobParts, {
     type: "application/zip",
   });
 }
