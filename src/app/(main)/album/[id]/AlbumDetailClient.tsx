@@ -28,7 +28,7 @@ import {
   getAlbumJoinPath,
 } from "@/lib/utils/qr-generate";
 import { createZipBlob } from "@/lib/utils/zip";
-import { getDeviceId, getDeviceUser } from "@/lib/device-user";
+import { getDeviceUser } from "@/lib/device-user";
 import { setActiveAlbumId } from "@/lib/active-album";
 import type { Album, Media, MediaTask } from "@/types/database";
 import type { MediaGalleryView } from "@/components/album/MediaGallery";
@@ -57,6 +57,7 @@ export default function AlbumDetailClient({
   const [copied, setCopied] = useState(false);
   const [mediaView, setMediaView] = useState<MediaGalleryView>("grid");
   const [canManageMedia, setCanManageMedia] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(album.cover_image_url || null);
   const [albumName, setAlbumName] = useState(album.name);
   const [renameDraft, setRenameDraft] = useState(album.name);
@@ -67,8 +68,7 @@ export default function AlbumDetailClient({
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const moreMenuRef = useRef<HTMLDivElement | null>(null);
 
-  // Determine ownership client-side via device ID.
-  const isOwner = getDeviceId() === albumOwnerId;
+  const isOwner = currentUserId === albumOwnerId;
 
   // Persist active album context for Album/Share hub pages.
   useEffect(() => {
@@ -81,9 +81,11 @@ export default function AlbumDetailClient({
     const resolvePermissions = async () => {
       try {
         const user = await getDeviceUser();
-        const canManage = user.role === "platform_admin";
+        setCurrentUserId(user.id);
+        const canManage = user.role === "platform_admin" || user.id === albumOwnerId;
         if (!cancelled) setCanManageMedia(canManage);
       } catch {
+        if (!cancelled) setCurrentUserId("");
         if (!cancelled) setCanManageMedia(false);
       }
     };
@@ -477,7 +479,7 @@ export default function AlbumDetailClient({
               </Button>
             )}
           </div>
-          <PromptList tasks={tasks} albumId={album.id} isOwner={isOwner} />
+          <PromptList tasks={tasks} isOwner={isOwner} />
         </div>
       )}
 

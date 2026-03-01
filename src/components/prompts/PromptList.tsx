@@ -7,11 +7,10 @@ import type { MediaTask } from "@/types/database";
 
 interface PromptListProps {
   tasks: MediaTask[];
-  albumId: string;
   isOwner: boolean;
 }
 
-export default function PromptList({ tasks, albumId, isOwner }: PromptListProps) {
+export default function PromptList({ tasks, isOwner }: PromptListProps) {
   const handleDelete = async (taskId: string) => {
     const supabase = createClient();
     await supabase.from("media_tasks").delete().eq("id", taskId);

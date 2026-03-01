@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+:root {
+  --font-jakarta: "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
 @theme inline {
   --color-background: #fafafa;
   --color-foreground: #111827;

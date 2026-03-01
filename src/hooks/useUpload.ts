@@ -7,6 +7,7 @@ import type { UploadFile, Media } from "@/types/database";
 interface UseUploadOptions {
   albumId: string;
   guestName?: string;
+  joinCode?: string;
   onUploadComplete?: (media: Media) => void;
 }
 
@@ -15,7 +16,7 @@ const isDemoMode = () => {
   return !url || url.includes("your-project");
 };
 
-export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOptions) {
+export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: UseUploadOptions) {
   const [uploads, setUploads] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -101,6 +102,9 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
         const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
         const formData = new FormData();
         formData.append("albumId", albumId);
+        if (joinCode) {
+          formData.append("joinCode", joinCode);
+        }
         formData.append("file", compressed, compressed.name);
 
         const uploadApiResponse = await fetch("/api/uploads/r2/upload", {
@@ -136,12 +140,18 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
 
         let uploaderId: string | null = null;
         if (!guestName) {
-          const { data: authData } = await supabase.auth.getUser();
-          uploaderId = authData.user?.id || null;
+          try {
+            // Ensure uploader_id points to an existing profile row.
+            const { getDeviceUser } = await import("@/lib/device-user");
+            uploaderId = (await getDeviceUser()).id;
+          } catch {
+            const { data: authData } = await supabase.auth.getUser();
+            uploaderId = authData.user?.id || null;
+          }
         }
 
         // Step 5: Insert media record
-        const { data: mediaData, error: dbError } = await supabase
+        const primaryInsert = await supabase
           .from("media")
           .insert({
             album_id: albumId,
@@ -157,6 +167,43 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
           })
           .select()
           .single();
+
+        let mediaData = primaryInsert.data;
+        let dbError = primaryInsert.error;
+
+        // Fallback for environments where storage columns migration wasn't applied yet.
+        if (dbError) {
+          const maybeCode =
+            dbError && typeof dbError === "object" && "code" in dbError
+              ? String((dbError as { code?: string }).code || "")
+              : "";
+          const maybeMessage =
+            dbError && typeof dbError === "object" && "message" in dbError
+              ? String((dbError as { message?: string }).message || "")
+              : "";
+          const missingStorageColumns =
+            maybeCode === "42703" || /storage_provider|storage_key/i.test(maybeMessage);
+
+          if (missingStorageColumns) {
+            const fallbackInsert = await supabase
+              .from("media")
+              .insert({
+                album_id: albumId,
+                uploader_id: uploaderId,
+                guest_name: guestName || null,
+                file_url: fileUrl,
+                media_type: mediaType,
+                width: dimensions.width,
+                height: dimensions.height,
+                file_size: compressed.size,
+              })
+              .select()
+              .single();
+
+            mediaData = fallbackInsert.data;
+            dbError = fallbackInsert.error;
+          }
+        }
 
         if (dbError) throw dbError;
         updateUpload(uploadFile.id, { progress: 85 });
@@ -176,7 +223,7 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
         });
       }
     },
-    [albumId, guestName, updateUpload, onUploadComplete]
+    [albumId, guestName, joinCode, updateUpload, onUploadComplete]
   );
 
   const uploadFiles = useCallback(
