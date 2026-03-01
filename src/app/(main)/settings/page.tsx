@@ -130,29 +130,37 @@ export default function SettingsPage() {
     setAvatarUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append("profileId", deviceId);
-      formData.append("file", file, file.name);
-
-      const uploadResponse = await fetch("/api/uploads/r2/avatar", {
+      // Step 1: Get presigned upload URL (small JSON request, no file body)
+      const presignResponse = await fetch("/api/uploads/r2/avatar-presign", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: deviceId,
+          fileName: file.name,
+          contentType: file.type,
+        }),
       });
 
-      if (!uploadResponse.ok) {
-        const contentType = uploadResponse.headers.get("content-type") || "";
-        let message = "Failed to upload avatar";
-        if (contentType.includes("application/json")) {
-          const payload = (await uploadResponse.json().catch(() => ({}))) as { error?: string };
-          message = payload.error || message;
-        } else {
-          const text = await uploadResponse.text().catch(() => "");
-          if (text) message = text;
-        }
-        throw new Error(message);
+      if (!presignResponse.ok) {
+        const payload = (await presignResponse.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Failed to get upload URL");
       }
 
-      const { fileUrl } = (await uploadResponse.json()) as { fileUrl: string };
+      const { uploadUrl, fileUrl } = (await presignResponse.json()) as {
+        uploadUrl: string;
+        fileUrl: string;
+      };
+
+      // Step 2: Upload directly from browser to R2
+      const r2Response = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+
+      if (!r2Response.ok) {
+        throw new Error(`Upload to storage failed (${r2Response.status})`);
+      }
 
       const supabase = createClient();
       const { error: updateError } = await supabase

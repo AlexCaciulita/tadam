@@ -228,21 +228,38 @@ export default function AlbumDetailClient({
     }
 
     try {
-      const formData = new FormData();
-      formData.append("albumId", album.id);
-      formData.append("file", file, file.name);
-
-      const uploadResponse = await fetch("/api/uploads/r2/upload", {
+      // Step 1: Get presigned upload URL (small JSON request, no file body)
+      const presignResponse = await fetch("/api/uploads/r2/presign", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          albumId: album.id,
+          fileName: file.name,
+          contentType: file.type,
+          fileSize: file.size,
+        }),
       });
 
-      if (!uploadResponse.ok) {
-        const payload = (await uploadResponse.json().catch(() => ({}))) as { error?: string };
+      if (!presignResponse.ok) {
+        const payload = (await presignResponse.json().catch(() => ({}))) as { error?: string };
         throw new Error(payload.error || "Failed to upload hero image");
       }
 
-      const { fileUrl } = (await uploadResponse.json()) as { fileUrl: string };
+      const { uploadUrl, fileUrl } = (await presignResponse.json()) as {
+        uploadUrl: string;
+        fileUrl: string;
+      };
+
+      // Step 2: Upload directly from browser to R2
+      const r2Response = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+
+      if (!r2Response.ok) {
+        throw new Error(`Upload to storage failed (${r2Response.status})`);
+      }
 
       const supabase = createClient();
       const { error: updateError } = await supabase

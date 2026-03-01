@@ -84,9 +84,6 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
 
   const uploadFileReal = useCallback(
     async (uploadFile: UploadFile) => {
-      const { createClient } = await import("@/lib/supabase/client");
-      const supabase = createClient();
-
       try {
         // Step 1: Compress image
         updateUpload(uploadFile.id, { status: "compressing", progress: 10 });
@@ -96,177 +93,172 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         const dimensions = await getImageDimensions(compressed);
         updateUpload(uploadFile.id, { progress: 20 });
 
-        // Step 3: Upload file to R2 through same-origin API route
-        updateUpload(uploadFile.id, { status: "uploading", progress: 30 });
+        // Step 3: Get presigned upload URL (small JSON request, no file body)
+        updateUpload(uploadFile.id, { status: "uploading", progress: 25 });
 
         const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
-        const formData = new FormData();
-        formData.append("albumId", albumId);
-        if (joinCode) {
-          formData.append("joinCode", joinCode);
-        }
-        if (guestName) {
-          formData.append("guestName", guestName);
-        }
-        formData.append("file", compressed, compressed.name);
 
-        const uploadApiResponse = await fetch("/api/uploads/r2/upload", {
+        const presignResponse = await fetch("/api/uploads/r2/presign", {
           method: "POST",
-          body: formData,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            albumId,
+            fileName: compressed.name || "upload.bin",
+            contentType: compressed.type || "application/octet-stream",
+            fileSize: compressed.size,
+          }),
         });
 
-        if (!uploadApiResponse.ok) {
-          const contentType = uploadApiResponse.headers.get("content-type") || "";
-          let errorMessage = "Failed to upload file";
-
-          if (contentType.includes("application/json")) {
-            const errorData = (await uploadApiResponse.json().catch(() => ({}))) as {
-              error?: string;
-            };
-            errorMessage = errorData.error || errorMessage;
-          } else {
-            const errorText = await uploadApiResponse.text().catch(() => "");
-            if (errorText) {
-              errorMessage = errorText;
-            }
-          }
-
-          throw new Error(errorMessage);
+        if (!presignResponse.ok) {
+          const errorData = (await presignResponse.json().catch(() => ({}))) as { error?: string };
+          throw new Error(errorData.error || "Failed to get upload URL");
         }
 
-        const { fileUrl, objectKey, media: serverMedia } = (await uploadApiResponse.json()) as {
+        const { uploadUrl, fileUrl, objectKey } = (await presignResponse.json()) as {
+          uploadUrl: string;
           fileUrl: string;
           objectKey: string;
-          media?: Media | null;
         };
+
+        updateUpload(uploadFile.id, { progress: 35 });
+
+        // Step 4: Upload file directly from browser to R2 (bypasses serverless function size limits)
+        const r2Response = await fetch(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": compressed.type || "application/octet-stream" },
+          body: compressed,
+        });
+
+        if (!r2Response.ok) {
+          throw new Error(`Upload to storage failed (${r2Response.status})`);
+        }
 
         updateUpload(uploadFile.id, { progress: 70 });
 
-        // If API already inserted media row server-side, skip client DB insert.
-        if (serverMedia) {
-          updateUpload(uploadFile.id, { progress: 85 });
-          updateUpload(uploadFile.id, {
-            status: "success",
-            progress: 100,
-            url: fileUrl,
+        // Step 5: Confirm upload and insert media record server-side (small JSON request)
+        let media: Media | null = null;
+        try {
+          const confirmResponse = await fetch("/api/uploads/r2/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              albumId,
+              guestName: guestName || undefined,
+              fileUrl,
+              objectKey,
+              mediaType,
+              fileSize: compressed.size,
+              width: dimensions.width,
+              height: dimensions.height,
+            }),
           });
-          onUploadComplete?.(serverMedia as Media);
-          return;
-        }
 
-        let uploaderId: string | null = null;
-        if (!guestName) {
-          try {
-            const { getDeviceUser } = await import("@/lib/device-user");
-            uploaderId = (await getDeviceUser()).id;
-          } catch {
-            const { data: authData } = await supabase.auth.getUser();
-            uploaderId = authData.user?.id || null;
+          if (confirmResponse.ok) {
+            const result = (await confirmResponse.json()) as { media?: Media | null };
+            media = result.media ?? null;
           }
+        } catch {
+          // Server-side confirm failed; fall back to client-side insert below.
         }
 
-        // Step 5: Insert media record
-        const primaryInsert = await supabase
-          .from("media")
-          .insert({
-            album_id: albumId,
-            uploader_id: uploaderId,
-            guest_name: guestName || null,
-            file_url: fileUrl,
-            storage_provider: "r2",
-            storage_key: objectKey,
-            media_type: mediaType,
-            width: dimensions.width,
-            height: dimensions.height,
-            file_size: compressed.size,
-          })
-          .select()
-          .single();
+        // Step 6: Client-side DB insert fallback
+        if (!media) {
+          const { createClient } = await import("@/lib/supabase/client");
+          const supabase = createClient();
 
-        let mediaData = primaryInsert.data;
-        let dbError = primaryInsert.error;
-
-        // Fallback for environments where R2 storage columns are not present yet.
-        if (dbError) {
-          const maybeCode =
-            dbError && typeof dbError === "object" && "code" in dbError
-              ? String((dbError as { code?: string }).code || "")
-              : "";
-          const maybeMessage =
-            dbError && typeof dbError === "object" && "message" in dbError
-              ? String((dbError as { message?: string }).message || "")
-              : "";
-          const missingStorageColumns =
-            maybeCode === "42703" || /storage_provider|storage_key/i.test(maybeMessage);
-
-          if (missingStorageColumns) {
-            const fallbackInsert = await supabase
-              .from("media")
-              .insert({
-                album_id: albumId,
-                uploader_id: uploaderId,
-                guest_name: guestName || null,
-                file_url: fileUrl,
-                media_type: mediaType,
-                width: dimensions.width,
-                height: dimensions.height,
-                file_size: compressed.size,
-              })
-              .select()
-              .single();
-
-            mediaData = fallbackInsert.data;
-            dbError = fallbackInsert.error;
+          let uploaderId: string | null = null;
+          if (!guestName) {
+            try {
+              const { getDeviceUser } = await import("@/lib/device-user");
+              uploaderId = (await getDeviceUser()).id;
+            } catch {
+              const { data: authData } = await supabase.auth.getUser();
+              uploaderId = authData.user?.id || null;
+            }
           }
-        }
 
-        if (dbError) {
-          const maybeCode =
-            dbError && typeof dbError === "object" && "code" in dbError
-              ? String((dbError as { code?: string }).code || "")
-              : "";
-          const maybeMessage =
-            dbError && typeof dbError === "object" && "message" in dbError
-              ? String((dbError as { message?: string }).message || "")
-              : "";
-          const uploaderFkFailure =
-            maybeCode === "23503" || /uploader_id|foreign key/i.test(maybeMessage);
+          const primaryInsert = await supabase
+            .from("media")
+            .insert({
+              album_id: albumId,
+              uploader_id: uploaderId,
+              guest_name: guestName || null,
+              file_url: fileUrl,
+              storage_provider: "r2",
+              storage_key: objectKey,
+              media_type: mediaType,
+              width: dimensions.width,
+              height: dimensions.height,
+              file_size: compressed.size,
+            })
+            .select()
+            .single();
 
-          // Fresh devices can hit FK issues if their profile row doesn't exist yet.
-          // Keep the upload usable by storing media without uploader_id.
-          if (uploaderFkFailure) {
-            const fkFallbackInsert = await supabase
-              .from("media")
-              .insert({
-                album_id: albumId,
-                uploader_id: null,
-                guest_name: guestName || null,
-                file_url: fileUrl,
-                storage_provider: "r2",
-                storage_key: objectKey,
-                media_type: mediaType,
-                width: dimensions.width,
-                height: dimensions.height,
-                file_size: compressed.size,
-              })
-              .select()
-              .single();
+          let mediaData = primaryInsert.data;
+          let dbError = primaryInsert.error;
 
-            mediaData = fkFallbackInsert.data;
-            dbError = fkFallbackInsert.error;
+          if (dbError) {
+            const code = String((dbError as { code?: string })?.code || "");
+            const msg = String((dbError as { message?: string })?.message || "");
+
+            if (code === "42703" || /storage_provider|storage_key/i.test(msg)) {
+              const fallback = await supabase
+                .from("media")
+                .insert({
+                  album_id: albumId,
+                  uploader_id: uploaderId,
+                  guest_name: guestName || null,
+                  file_url: fileUrl,
+                  media_type: mediaType,
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  file_size: compressed.size,
+                })
+                .select()
+                .single();
+              mediaData = fallback.data;
+              dbError = fallback.error;
+            }
           }
+
+          if (dbError) {
+            const code = String((dbError as { code?: string })?.code || "");
+            const msg = String((dbError as { message?: string })?.message || "");
+
+            if (code === "23503" || /uploader_id|foreign key/i.test(msg)) {
+              const fkFallback = await supabase
+                .from("media")
+                .insert({
+                  album_id: albumId,
+                  uploader_id: null,
+                  guest_name: guestName || null,
+                  file_url: fileUrl,
+                  storage_provider: "r2",
+                  storage_key: objectKey,
+                  media_type: mediaType,
+                  width: dimensions.width,
+                  height: dimensions.height,
+                  file_size: compressed.size,
+                })
+                .select()
+                .single();
+              mediaData = fkFallback.data;
+              dbError = fkFallback.error;
+            }
+          }
+
+          if (dbError) throw dbError;
+          media = mediaData as Media;
         }
 
-        if (dbError) throw dbError;
         updateUpload(uploadFile.id, { progress: 85 });
-
         updateUpload(uploadFile.id, {
           status: "success",
           progress: 100,
           url: fileUrl,
         });
 
-        onUploadComplete?.(mediaData as Media);
+        onUploadComplete?.(media as Media);
       } catch (error) {
         console.error("Upload failed:", error);
         updateUpload(uploadFile.id, {
@@ -275,7 +267,7 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         });
       }
     },
-    [albumId, guestName, joinCode, updateUpload, onUploadComplete]
+    [albumId, guestName, updateUpload, onUploadComplete]
   );
 
   const uploadFiles = useCallback(
