@@ -57,8 +57,8 @@ export async function getDeviceUser(): Promise<Profile> {
   const derivedUsername =
     sanitizeUsername(metadataUsername) ||
     sanitizeUsername(emailUsername) ||
-    `user_${shortId}`;
-  const derivedDisplayName = metadataDisplayName || derivedUsername || `User ${shortId}`;
+    `guest_${shortId}`;
+  const derivedDisplayName = metadataDisplayName || derivedUsername || "Guest";
 
   // Try existing profile first to avoid overwriting role or display data.
   const { data: existingProfile } = await supabase
