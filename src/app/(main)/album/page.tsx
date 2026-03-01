@@ -87,7 +87,15 @@ export default function AlbumHubPage() {
         setAlbums(resolvedAlbums);
 
         if (resolvedAlbums.length > 0) {
-          setActiveAlbumId(resolvedAlbums[0].id);
+          const currentAlbumId =
+            (selectedFromQuery &&
+            resolvedAlbums.some((album) => album.id === selectedFromQuery)
+              ? selectedFromQuery
+              : getActiveAlbumId() &&
+                  resolvedAlbums.some((album) => album.id === getActiveAlbumId())
+                ? (getActiveAlbumId() as string)
+                : resolvedAlbums[0].id) || resolvedAlbums[0].id;
+          setActiveAlbumId(currentAlbumId);
           const { data: mediaRows } = await supabase
             .from("media")
             .select("album_id")

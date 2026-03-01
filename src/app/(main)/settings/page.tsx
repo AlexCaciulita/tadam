@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import Avatar from "@/components/shared/Avatar";
 import Button from "@/components/shared/Button";
@@ -11,6 +12,8 @@ import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 export default function SettingsPage() {
   const { t } = useI18n();
+  const searchParams = useSearchParams();
+  const selectedFromQuery = searchParams.get("album") || "";
   const [displayName, setDisplayName] = useState("");
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -30,7 +33,7 @@ export default function SettingsPage() {
         let targetProfile = deviceUser;
 
         if (deviceUser.role === "platform_admin") {
-          const activeAlbumId = getActiveAlbumId();
+          const activeAlbumId = selectedFromQuery || getActiveAlbumId();
           if (activeAlbumId) {
             const { data: activeAlbum } = await supabase
               .from("albums")
@@ -63,7 +66,7 @@ export default function SettingsPage() {
     };
 
     fetchProfile();
-  }, []);
+  }, [selectedFromQuery]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

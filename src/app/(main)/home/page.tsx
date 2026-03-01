@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { CalendarDays, FolderOpen, Images, Loader2, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getDeviceUser } from "@/lib/device-user";
@@ -23,6 +24,8 @@ function dedupeAlbums(albums: Album[]) {
 
 export default function HomePage() {
   const { t } = useI18n();
+  const searchParams = useSearchParams();
+  const selectedFromQuery = searchParams.get("album") || "";
   const [albums, setAlbums] = useState<Album[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [recentMedia, setRecentMedia] = useState<Media[]>([]);
@@ -38,8 +41,9 @@ export default function HomePage() {
         let contextProfile: Profile = deviceUser;
 
         // Admin context: when an active album is selected, show that couple's data.
+        const contextAlbumId = selectedFromQuery || getActiveAlbumId() || "";
         if (deviceUser.role === "platform_admin") {
-          const activeAlbumId = getActiveAlbumId();
+          const activeAlbumId = contextAlbumId;
           if (activeAlbumId) {
             const { data: activeAlbum } = await supabase
               .from("albums")
@@ -94,7 +98,11 @@ export default function HomePage() {
         ]);
         setAlbums(allAlbums);
         if (allAlbums.length > 0) {
-          setActiveAlbumId(allAlbums[0].id);
+          const currentAlbumId =
+            (contextAlbumId && allAlbums.some((album) => album.id === contextAlbumId)
+              ? contextAlbumId
+              : allAlbums[0].id) || allAlbums[0].id;
+          setActiveAlbumId(currentAlbumId);
         }
 
         if (allAlbums.length > 0) {
@@ -131,7 +139,7 @@ export default function HomePage() {
     };
 
     fetchData();
-  }, []);
+  }, [selectedFromQuery]);
 
   if (loading) {
     return (

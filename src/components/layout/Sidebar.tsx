@@ -47,6 +47,15 @@ export default function Sidebar({ user }: SidebarProps) {
   const activeAdminTab = searchParams.get("tab") || "profiles";
   const albumIdFromQuery = searchParams.get("album") || "";
   const allNavItems = inAdminCenter ? adminNavItems : navItems;
+  const pathParts = pathname.split("/").filter(Boolean);
+  const albumIdFromPath = pathParts[0] === "album" ? pathParts[1] : "";
+  const activeAlbumContextId = albumIdFromPath || albumIdFromQuery || getActiveAlbumId() || "";
+  const decorateHref = (href: string) => {
+    if (!isAdmin || inAdminCenter || !activeAlbumContextId) return href;
+    if (!["/home", "/album", "/share", "/settings"].includes(href)) return href;
+    const separator = href.includes("?") ? "&" : "?";
+    return `${href}${separator}album=${activeAlbumContextId}`;
+  };
   const headerDisplayName =
     inAdminCenter && isAdmin
       ? t("sidebar.admin")
@@ -72,9 +81,7 @@ export default function Sidebar({ user }: SidebarProps) {
         return;
       }
 
-      const pathParts = pathname.split("/").filter(Boolean);
-      const albumIdFromPath = pathParts[0] === "album" ? pathParts[1] : "";
-      const activeAlbumId = albumIdFromPath || albumIdFromQuery || getActiveAlbumId();
+      const activeAlbumId = activeAlbumContextId;
 
       if (!activeAlbumId) {
         setDisplayUser(user);
@@ -113,7 +120,7 @@ export default function Sidebar({ user }: SidebarProps) {
     return () => {
       cancelled = true;
     };
-  }, [user, pathname, inAdminCenter, albumIdFromQuery]);
+  }, [user, inAdminCenter, activeAlbumContextId]);
 
   return (
     <aside className="hidden md:flex md:fixed md:left-0 md:top-0 md:bottom-0 z-30 flex-col h-screen w-64 border-r border-border/80 bg-white/85 backdrop-blur-sm py-6 px-4 overflow-y-auto hide-scrollbar">
@@ -151,7 +158,7 @@ export default function Sidebar({ user }: SidebarProps) {
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={decorateHref(item.href)}
               className={cn(
                 "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-colors",
                 isActive

@@ -28,13 +28,15 @@ export function getDeviceId(): string {
  * Caches the result in memory.
  */
 export async function getDeviceUser(): Promise<Profile> {
-  if (cachedUser) return cachedUser;
-
   const supabase = createClient();
   const { data: authData } = await supabase.auth.getUser();
   const authUser = authData.user;
   const id = authUser?.id || getDeviceId();
   const shortId = id.slice(0, 8);
+
+  // Avoid stale identity when auth state changes (guest -> logged in, user switch, etc.).
+  if (cachedUser?.id === id) return cachedUser;
+  cachedUser = null;
 
   const sanitizeUsername = (value: string) =>
     value
@@ -53,6 +55,10 @@ export async function getDeviceUser(): Promise<Profile> {
     typeof authUser?.user_metadata?.display_name === "string"
       ? authUser.user_metadata.display_name
       : "";
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_LOGIN_EMAIL?.toLowerCase();
+  const authEmail = authUser?.email?.toLowerCase() || "";
+  const isAdminEmail = Boolean(adminEmail && authEmail && authEmail === adminEmail);
+  const derivedRole: Profile["role"] = isAdminEmail ? "platform_admin" : "user";
 
   const derivedUsername =
     sanitizeUsername(metadataUsername) ||
@@ -72,34 +78,48 @@ export async function getDeviceUser(): Promise<Profile> {
     return cachedUser;
   }
 
-  // Insert profile if missing.
-  const { data, error } = await supabase
-    .from("profiles")
-    .insert({
-      id,
-      username: derivedUsername,
-      display_name: derivedDisplayName,
-      role: "user",
-    })
-    .select()
-    .maybeSingle();
+  // Insert profile if missing. Retry with a fallback username on conflicts.
+  const usernameCandidates = Array.from(
+    new Set([
+      derivedUsername,
+      `${derivedUsername}_${shortId}`.slice(0, 30),
+      `guest_${shortId}`,
+    ])
+  );
 
-  if (data) {
-    cachedUser = data as Profile;
-    return cachedUser;
-  }
-
-  if (error || !data) {
-    const { data: existing } = await supabase
+  for (const candidate of usernameCandidates) {
+    const { data, error } = await supabase
       .from("profiles")
-      .select("*")
-      .eq("id", id)
-      .single();
+      .insert({
+        id,
+        username: candidate,
+        display_name: derivedDisplayName,
+        role: derivedRole,
+      })
+      .select()
+      .maybeSingle();
 
-    if (existing) {
-      cachedUser = existing as Profile;
+    if (data) {
+      cachedUser = data as Profile;
       return cachedUser;
     }
+
+    const errorCode =
+      error && typeof error === "object" && "code" in error
+        ? String((error as { code?: string }).code)
+        : "";
+    if (errorCode !== "23505") break;
+  }
+
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (existing) {
+    cachedUser = existing as Profile;
+    return cachedUser;
   }
 
   // Final fallback: return synthetic profile (won't be in DB)
@@ -108,7 +128,7 @@ export async function getDeviceUser(): Promise<Profile> {
     username: derivedUsername,
     display_name: derivedDisplayName,
     avatar_url: null,
-    role: "user",
+    role: derivedRole,
     created_at: new Date().toISOString(),
   };
   return cachedUser;
