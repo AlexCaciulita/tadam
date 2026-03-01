@@ -105,6 +105,9 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         if (joinCode) {
           formData.append("joinCode", joinCode);
         }
+        if (guestName) {
+          formData.append("guestName", guestName);
+        }
         formData.append("file", compressed, compressed.name);
 
         const uploadApiResponse = await fetch("/api/uploads/r2/upload", {
@@ -131,12 +134,25 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           throw new Error(errorMessage);
         }
 
-        const { fileUrl, objectKey } = (await uploadApiResponse.json()) as {
+        const { fileUrl, objectKey, media: serverMedia } = (await uploadApiResponse.json()) as {
           fileUrl: string;
           objectKey: string;
+          media?: Media | null;
         };
 
         updateUpload(uploadFile.id, { progress: 70 });
+
+        // If API already inserted media row server-side, skip client DB insert.
+        if (serverMedia) {
+          updateUpload(uploadFile.id, { progress: 85 });
+          updateUpload(uploadFile.id, {
+            status: "success",
+            progress: 100,
+            url: fileUrl,
+          });
+          onUploadComplete?.(serverMedia as Media);
+          return;
+        }
 
         let uploaderId: string | null = null;
         if (!guestName) {

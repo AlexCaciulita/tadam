@@ -169,6 +169,50 @@ export default function MediaGallery({
     onDelete: handleDeleteMedia,
   });
 
+  // Fallback sync: ensures new uploads appear without manual refresh
+  // even when realtime events are delayed/missed on some clients.
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncLatestMedia = async () => {
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("media")
+          .select("*")
+          .eq("album_id", albumId)
+          .order("created_at", { ascending: false })
+          .limit(60);
+
+        if (cancelled || error || !data) return;
+
+        const latestRows = data as Media[];
+        setRealtimeMedia((prev) => {
+          const knownIds = new Set<string>([
+            ...initialMedia.map((item) => item.id),
+            ...prev.map((item) => item.id),
+          ]);
+
+          const additions = latestRows.filter((item) => !knownIds.has(item.id));
+          if (additions.length === 0) return prev;
+          return [...additions, ...prev];
+        });
+      } catch (error) {
+        console.warn("Media fallback sync failed", error);
+      }
+    };
+
+    // Run once quickly, then keep polling.
+    syncLatestMedia();
+    const interval = window.setInterval(syncLatestMedia, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [albumId, initialMedia]);
+
   if (media.length === 0) {
     return null;
   }
