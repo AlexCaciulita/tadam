@@ -134,12 +134,18 @@ export function useUpload({ albumId, guestName, onUploadComplete }: UseUploadOpt
 
         updateUpload(uploadFile.id, { progress: 70 });
 
+        let uploaderId: string | null = null;
+        if (!guestName) {
+          const { data: authData } = await supabase.auth.getUser();
+          uploaderId = authData.user?.id || null;
+        }
+
         // Step 5: Insert media record
         const { data: mediaData, error: dbError } = await supabase
           .from("media")
           .insert({
             album_id: albumId,
-            uploader_id: guestName ? null : (await import("@/lib/device-user")).getDeviceId(),
+            uploader_id: uploaderId,
             guest_name: guestName || null,
             file_url: fileUrl,
             storage_provider: "r2",
