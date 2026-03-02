@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { compressImage, compressVideo, getImageDimensions, createFilePreview } from "@/lib/utils/image-resize";
+import { compressImage, compressVideo, getImageDimensions, createFilePreview, revokeFilePreview } from "@/lib/utils/image-resize";
 import type { UploadFile, Media } from "@/types/database";
 
 interface UseUploadOptions {
@@ -139,6 +139,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           const xhr = new XMLHttpRequest();
           xhr.open("PUT", uploadUrl);
           xhr.setRequestHeader("Content-Type", compressed.type || "application/octet-stream");
+          // Scale timeout with file size: min 2 min, ~4s per MB, max 30 min
+          xhr.timeout = Math.min(Math.max(120_000, compressed.size / 256), 1_800_000);
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -330,7 +332,10 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
   );
 
   const reset = useCallback(() => {
-    setUploads([]);
+    setUploads((prev) => {
+      prev.forEach((u) => { if (u.preview) revokeFilePreview(u.preview); });
+      return [];
+    });
     setIsUploading(false);
   }, []);
 

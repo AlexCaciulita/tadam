@@ -41,22 +41,28 @@ export function getImageDimensions(
   file: File
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Timed out reading dimensions"));
+    }, 15_000);
+
     if (file.type.startsWith("video/")) {
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = () => {
+        clearTimeout(timeout);
         URL.revokeObjectURL(video.src);
         resolve({ width: video.videoWidth, height: video.videoHeight });
       };
-      video.onerror = reject;
+      video.onerror = () => { clearTimeout(timeout); reject(new Error("Failed to read video dimensions")); };
       video.src = URL.createObjectURL(file);
     } else {
       const img = new Image();
       img.onload = () => {
+        clearTimeout(timeout);
         URL.revokeObjectURL(img.src);
         resolve({ width: img.naturalWidth, height: img.naturalHeight });
       };
-      img.onerror = reject;
+      img.onerror = () => { clearTimeout(timeout); reject(new Error("Failed to read image dimensions")); };
       img.src = URL.createObjectURL(file);
     }
   });
@@ -71,7 +77,7 @@ const TARGET_VIDEO_HEIGHT = 1080;
 const TARGET_VIDEO_BITRATE = 8_000_000; // 8 Mbps
 
 /**
- * Re-encode a video at 720p / 2.5 Mbps using MediaRecorder.
+ * Re-encode a video at 1080p / 8 Mbps using MediaRecorder.
  * Falls back to the original file if the browser doesn't support it or
  * the compressed version ends up larger.
  */
@@ -141,7 +147,10 @@ export async function compressVideo(
           if (e.data.size > 0) chunks.push(e.data);
         };
 
+        const stopTracks = () => combinedStream.getTracks().forEach((t) => t.stop());
+
         recorder.onstop = () => {
+          stopTracks();
           audioCtx?.close().catch(() => {});
           cleanup();
 
@@ -157,6 +166,7 @@ export async function compressVideo(
         };
 
         recorder.onerror = () => {
+          stopTracks();
           audioCtx?.close().catch(() => {});
           cleanup();
           resolve(file);
@@ -173,7 +183,13 @@ export async function compressVideo(
         };
 
         recorder.start(100);
-        await video.play();
+        try {
+          await video.play();
+        } catch {
+          // play() failed — stop the recorder so onstop fires and cleans up
+          recorder.stop();
+          return;
+        }
         drawFrame();
 
         video.onended = () => {
