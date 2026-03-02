@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { compressImage, getImageDimensions, createFilePreview } from "@/lib/utils/image-resize";
+import { compressImage, compressVideo, getImageDimensions, createFilePreview } from "@/lib/utils/image-resize";
 import type { UploadFile, Media } from "@/types/database";
 
 interface UseUploadOptions {
@@ -85,16 +85,28 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
   const uploadFileReal = useCallback(
     async (uploadFile: UploadFile) => {
       try {
-        // Step 1: Compress image
-        updateUpload(uploadFile.id, { status: "compressing", progress: 10 });
-        const compressed = await compressImage(uploadFile.file);
+        // Step 1: Compress media
+        updateUpload(uploadFile.id, { status: "compressing", progress: 5 });
+
+        const isVideo = uploadFile.file.type.startsWith("video/");
+        let compressed: File;
+
+        if (isVideo) {
+          compressed = await compressVideo(uploadFile.file, (fraction) => {
+            // Map compression progress to 5-20% range
+            updateUpload(uploadFile.id, { progress: Math.round(5 + fraction * 15) });
+          });
+        } else {
+          compressed = await compressImage(uploadFile.file);
+        }
 
         // Step 2: Get dimensions
+        updateUpload(uploadFile.id, { progress: 22 });
         const dimensions = await getImageDimensions(compressed);
-        updateUpload(uploadFile.id, { progress: 20 });
+        updateUpload(uploadFile.id, { progress: 25 });
 
         // Step 3: Get presigned upload URL (small JSON request, no file body)
-        updateUpload(uploadFile.id, { status: "uploading", progress: 25 });
+        updateUpload(uploadFile.id, { status: "uploading", progress: 28 });
 
         const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
 
@@ -122,16 +134,33 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
 
         updateUpload(uploadFile.id, { progress: 35 });
 
-        // Step 4: Upload file directly from browser to R2 (bypasses serverless function size limits)
-        const r2Response = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": compressed.type || "application/octet-stream" },
-          body: compressed,
-        });
+        // Step 4: Upload file directly from browser to R2 via XHR for real progress tracking
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", uploadUrl);
+          xhr.setRequestHeader("Content-Type", compressed.type || "application/octet-stream");
 
-        if (!r2Response.ok) {
-          throw new Error(`Upload to storage failed (${r2Response.status})`);
-        }
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              // Map upload progress to 35-70% range
+              const pct = Math.round(35 + (event.loaded / event.total) * 35);
+              updateUpload(uploadFile.id, { progress: pct });
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Upload to storage failed (${xhr.status})`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Upload to storage failed (network error)"));
+          xhr.ontimeout = () => reject(new Error("Upload timed out"));
+
+          xhr.send(compressed);
+        });
 
         updateUpload(uploadFile.id, { progress: 70 });
 

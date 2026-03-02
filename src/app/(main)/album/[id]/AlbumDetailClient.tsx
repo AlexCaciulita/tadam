@@ -38,6 +38,7 @@ interface AlbumDetailClientProps {
   initialMedia: Media[];
   tasks: MediaTask[];
   albumOwnerId: string;
+  viewerRole?: "member" | "guest";
 }
 
 export default function AlbumDetailClient({
@@ -45,6 +46,7 @@ export default function AlbumDetailClient({
   initialMedia,
   tasks: initialTasks,
   albumOwnerId,
+  viewerRole,
 }: AlbumDetailClientProps) {
   const [showQR, setShowQR] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
@@ -106,6 +108,9 @@ export default function AlbumDetailClient({
       document.removeEventListener("mousedown", handleOutsideClick);
     };
   }, [showMoreMenu]);
+
+  // Couple or admin can share and download; guests cannot.
+  const canShare = canManageMedia || viewerRole === "member" || !viewerRole;
 
   // Detect guest name from localStorage (set during the /join flow).
   const guestName = typeof window !== "undefined"
@@ -340,13 +345,15 @@ export default function AlbumDetailClient({
         {!lightboxOpen && (
           <UploadButton onFilesSelected={handleFilesSelected} variant="icon" />
         )}
-        <button
-          onClick={handleShowQR}
-          className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
-          title="Share Album"
-        >
-          <Share2 className="w-5 h-5 text-foreground" />
-        </button>
+        {canShare && (
+          <button
+            onClick={handleShowQR}
+            className="p-2.5 rounded-xl border border-border bg-white hover:bg-surface transition-colors"
+            title="Share Album"
+          >
+            <Share2 className="w-5 h-5 text-foreground" />
+          </button>
+        )}
         <div ref={moreMenuRef} className="relative">
           <button
             onClick={() => setShowMoreMenu(!showMoreMenu)}
@@ -356,13 +363,15 @@ export default function AlbumDetailClient({
           </button>
           {showMoreMenu && (
             <div className="absolute right-0 mt-1 w-48 bg-white rounded-xl shadow-lg border border-border py-1 z-20 min-w-[200px]">
-              <button
-                onClick={handleShowQR}
-                className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left"
-              >
-                <Share2 className="w-4 h-4" />
-                Share QR Code
-              </button>
+              {canShare && (
+                <button
+                  onClick={handleShowQR}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left"
+                >
+                  <Share2 className="w-4 h-4" />
+                  Share QR Code
+                </button>
+              )}
               <button
                 onClick={() => {
                   setShowSlideshow(true);
@@ -373,14 +382,16 @@ export default function AlbumDetailClient({
                 <Presentation className="w-4 h-4" />
                 Live Slideshow
               </button>
-              <button
-                onClick={handleDownloadImages}
-                disabled={downloadingImages}
-                className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" />
-                {downloadingImages ? "Preparing ZIP..." : "Download images"}
-              </button>
+              {canShare && (
+                <button
+                  onClick={handleDownloadImages}
+                  disabled={downloadingImages}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm hover:bg-surface text-left disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  {downloadingImages ? "Preparing ZIP..." : "Download images"}
+                </button>
+              )}
               {canManageMedia && (
                 <>
                   <button
@@ -519,9 +530,11 @@ export default function AlbumDetailClient({
           description="You can start inviting contributors or start adding your media to the album."
           action={
             <div className="flex gap-3">
-              <Button variant="outline" onClick={handleShowQR}>
-                Invite
-              </Button>
+              {canShare && (
+                <Button variant="outline" onClick={handleShowQR}>
+                  Invite
+                </Button>
+              )}
               <UploadButton
                 onFilesSelected={handleFilesSelected}
                 variant="inline"

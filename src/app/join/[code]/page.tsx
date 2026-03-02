@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 const GUEST_KEY_PREFIX = "tadam_guest_album_";
+const ROLE_PREFIX = "tadam_album_role_";
 
 export default function JoinCodePage() {
   const { t } = useI18n();
@@ -39,10 +40,12 @@ export default function JoinCodePage() {
       const albumData = data as Album;
       setAlbum(albumData);
 
-      // If guest name is already stored, redirect straight to the album.
+      // If name is already stored, redirect straight to the album.
       const storedName = localStorage.getItem(`${GUEST_KEY_PREFIX}${albumData.id}`);
       if (storedName) {
-        router.replace(`/album/${albumData.id}`);
+        // Ensure role is set to member for the couple code path.
+        localStorage.setItem(`${ROLE_PREFIX}${albumData.id}`, "member");
+        router.replace(`/a/${albumData.id}`);
         return;
       }
 
@@ -55,18 +58,19 @@ export default function JoinCodePage() {
   const handleNameSubmit = async (name: string) => {
     if (!album) return;
 
-    // Store guest name keyed by album ID so the album page can read it.
+    // Store name and role (couple = member) so the album page can read it.
     localStorage.setItem(`${GUEST_KEY_PREFIX}${album.id}`, name);
+    localStorage.setItem(`${ROLE_PREFIX}${album.id}`, "member");
 
-    // Join album as guest
+    // Join album as member (couple)
     const supabase = createClient();
     await supabase.from("album_members").insert({
       album_id: album.id,
       guest_name: name,
-      role: "guest",
+      role: "member",
     });
 
-    router.replace(`/album/${album.id}`);
+    router.replace(`/a/${album.id}`);
   };
 
   if (loading) {

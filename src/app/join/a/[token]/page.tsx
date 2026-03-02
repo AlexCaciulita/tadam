@@ -10,6 +10,7 @@ import { Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/LanguageProvider";
 
 const GUEST_KEY_PREFIX = "tadam_guest_album_";
+const ROLE_PREFIX = "tadam_album_role_";
 
 export default function JoinAlbumTokenPage() {
   const { t } = useI18n();
@@ -41,7 +42,7 @@ export default function JoinAlbumTokenPage() {
 
       const storedName = localStorage.getItem(`${GUEST_KEY_PREFIX}${albumData.id}`);
       if (storedName) {
-        router.replace(`/album/${albumData.id}`);
+        router.replace(`/a/${albumData.id}`);
         return;
       }
 
@@ -55,6 +56,7 @@ export default function JoinAlbumTokenPage() {
     if (!album) return;
 
     localStorage.setItem(`${GUEST_KEY_PREFIX}${album.id}`, name);
+    localStorage.setItem(`${ROLE_PREFIX}${album.id}`, "guest");
 
     const supabase = createClient();
     await supabase.from("album_members").insert({
@@ -63,7 +65,7 @@ export default function JoinAlbumTokenPage() {
       role: "guest",
     });
 
-    router.replace(`/album/${album.id}`);
+    router.replace(`/a/${album.id}`);
   };
 
   if (loading) {

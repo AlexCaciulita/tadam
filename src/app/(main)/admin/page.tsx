@@ -705,10 +705,14 @@ export default function AdminPage() {
             <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 p-4 rounded-lg border border-border bg-surface/40">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground mb-1">Ready to share</p>
-                <p className="text-xs text-muted mb-1">
+                <p className="text-xs text-muted mb-2">
                   Client: @{createdWedding.owner.username} · Album: {createdWedding.album.name}
                 </p>
-                <p className="text-xs text-muted mb-2">Join code: {createdWedding.album.join_code}</p>
+                <div className="mb-3 p-2.5 rounded-lg border border-primary/20 bg-primary-light/30">
+                  <p className="text-xs font-semibold text-foreground mb-0.5">Couple Code (give to bride &amp; groom)</p>
+                  <p className="text-lg font-bold text-primary tracking-widest">{createdWedding.album.join_code}</p>
+                </div>
+                <p className="text-xs font-semibold text-foreground mb-1">Guest Link (for event guests)</p>
                 <div className="text-xs break-all rounded border border-border bg-white px-2 py-1.5 mb-2">
                   {createdWedding.joinUrl}
                 </div>
@@ -718,7 +722,7 @@ export default function AdminPage() {
                     onClick={handleCopyLink}
                     className="text-xs px-2 py-1 rounded border border-border hover:bg-white inline-flex items-center gap-1"
                   >
-                    <Copy className="w-3 h-3" /> {copiedLink ? "Copied" : "Copy Link"}
+                    <Copy className="w-3 h-3" /> {copiedLink ? "Copied" : "Copy Guest Link"}
                   </button>
                   <button
                     type="button"
@@ -726,10 +730,10 @@ export default function AdminPage() {
                     disabled={!createdWedding.qrDataUrl}
                     className="text-xs px-2 py-1 rounded border border-border hover:bg-white inline-flex items-center gap-1"
                   >
-                    <Download className="w-3 h-3" /> Download QR
+                    <Download className="w-3 h-3" /> Download Guest QR
                   </button>
                   <Link
-                    href={`/album/${createdWedding.album.id}`}
+                    href={`/a/${createdWedding.album.id}`}
                     className="text-xs px-2 py-1 rounded border border-border hover:bg-white inline-flex items-center gap-1"
                   >
                     <ExternalLink className="w-3 h-3" /> Open Album
@@ -737,13 +741,16 @@ export default function AdminPage() {
                 </div>
               </div>
               {createdWedding.qrDataUrl ? (
-                <Image
-                  src={createdWedding.qrDataUrl}
-                  alt="Album QR"
-                  width={176}
-                  height={176}
-                  className="w-44 h-44 bg-white border border-border rounded-lg p-2"
-                />
+                <div className="text-center">
+                  <p className="text-xs font-semibold text-muted mb-1">Guest QR</p>
+                  <Image
+                    src={createdWedding.qrDataUrl}
+                    alt="Guest QR"
+                    width={176}
+                    height={176}
+                    className="w-44 h-44 bg-white border border-border rounded-lg p-2"
+                  />
+                </div>
               ) : (
                 <div className="w-44 h-44 bg-surface border border-border rounded-lg p-2 flex items-center justify-center text-xs text-muted text-center">
                   QR unavailable.
@@ -868,11 +875,11 @@ export default function AdminPage() {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">{album.name}</p>
-                  <p className="text-xs text-muted truncate">Code: {album.join_code}</p>
+                  <p className="text-xs text-muted truncate">Couple Code: {album.join_code}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link
-                    href={`/album/${album.id}`}
+                    href={`/a/${album.id}`}
                     className="text-xs px-2 py-1 rounded border border-border hover:bg-white inline-flex items-center gap-1"
                   >
                     <ExternalLink className="w-3 h-3" /> Open
@@ -903,7 +910,11 @@ export default function AdminPage() {
               <p className="text-sm font-semibold text-foreground mb-1">
                 Share: {shareAlbum.name}
               </p>
-              <p className="text-xs text-muted mb-2">Permanent link</p>
+              <div className="mb-3 p-2.5 rounded-lg border border-primary/20 bg-primary-light/30">
+                <p className="text-xs font-semibold text-foreground mb-0.5">Couple Code</p>
+                <p className="text-lg font-bold text-primary tracking-widest">{shareAlbum.join_code}</p>
+              </div>
+              <p className="text-xs font-semibold text-foreground mb-1">Guest Link</p>
               <div className="text-xs break-all rounded border border-border bg-white px-2 py-1.5 mb-2">
                 {shareUrl}
               </div>
@@ -913,7 +924,7 @@ export default function AdminPage() {
                   onClick={handleCopyShareLink}
                   className="text-xs px-2 py-1 rounded border border-border hover:bg-white inline-flex items-center gap-1"
                 >
-                  <Copy className="w-3 h-3" /> {shareCopied ? "Copied" : "Copy Link"}
+                  <Copy className="w-3 h-3" /> {shareCopied ? "Copied" : "Copy Guest Link"}
                 </button>
                 <button
                   type="button"
@@ -921,7 +932,7 @@ export default function AdminPage() {
                   disabled={!shareQrDataUrl}
                   className="text-xs px-2 py-1 rounded border border-border hover:bg-white disabled:opacity-50 inline-flex items-center gap-1"
                 >
-                  <Download className="w-3 h-3" /> Save QR
+                  <Download className="w-3 h-3" /> Save Guest QR
                 </button>
                 <a
                   href={shareUrl}
@@ -934,13 +945,16 @@ export default function AdminPage() {
               </div>
               {shareLoading && <p className="text-xs text-muted">Generating QR...</p>}
               {shareQrDataUrl && (
-                <Image
-                  src={shareQrDataUrl}
-                  alt="Share QR"
-                  width={144}
-                  height={144}
-                  className="w-36 h-36 bg-white border border-border rounded-lg p-2"
-                />
+                <div className="text-center inline-block">
+                  <p className="text-xs font-semibold text-muted mb-1">Guest QR</p>
+                  <Image
+                    src={shareQrDataUrl}
+                    alt="Guest QR"
+                    width={144}
+                    height={144}
+                    className="w-36 h-36 bg-white border border-border rounded-lg p-2"
+                  />
+                </div>
               )}
             </div>
           )}

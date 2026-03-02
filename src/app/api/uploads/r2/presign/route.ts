@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildObjectKey, createUploadUrl } from "@/lib/r2/server";
 
 const ALLOWED_MIME_PREFIXES = ["image/", "video/"];
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_FILE_SIZE_BYTES = 500 * 1024 * 1024; // 500 MB
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,10 +30,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 413 });
     }
 
+    // Give more time for larger files (min 5 min, up to 30 min for 500MB)
+    const sizeBytes = typeof fileSize === "number" ? fileSize : 0;
+    const expiresInSeconds = Math.max(300, Math.ceil(sizeBytes / (1024 * 1024)) * 4);
+
     const objectKey = buildObjectKey(albumId, fileName);
     const { uploadUrl, fileUrl } = await createUploadUrl({
       objectKey,
-      expiresInSeconds: 120,
+      expiresInSeconds: Math.min(expiresInSeconds, 1800),
     });
 
     return NextResponse.json({
