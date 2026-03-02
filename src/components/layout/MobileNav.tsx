@@ -29,7 +29,7 @@ export default function MobileNav() {
   useEffect(() => {
     const init = async () => {
       const user = await getDeviceUser();
-      setIsAdmin(user.role === "platform_admin");
+      setIsAdmin(user?.role === "platform_admin");
     };
     init();
   }, []);

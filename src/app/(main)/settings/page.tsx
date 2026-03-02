@@ -29,6 +29,10 @@ export default function SettingsPage() {
     const fetchProfile = async () => {
       try {
         const deviceUser = await getDeviceUser();
+        if (!deviceUser) {
+          setFetching(false);
+          return;
+        }
         const supabase = createClient();
         let targetProfile = deviceUser;
 

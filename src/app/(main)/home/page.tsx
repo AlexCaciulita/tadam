@@ -37,6 +37,10 @@ export default function HomePage() {
     const fetchData = async () => {
       try {
         const deviceUser = await getDeviceUser();
+        if (!deviceUser) {
+          setLoading(false);
+          return;
+        }
         const supabase = createClient();
         let contextProfile: Profile = deviceUser;
 

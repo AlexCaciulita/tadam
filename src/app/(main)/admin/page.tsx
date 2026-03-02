@@ -122,7 +122,7 @@ export default function AdminPage() {
         setRequiresAuth(false);
         const deviceUser = await getDeviceUser();
 
-        if (deviceUser.role !== "platform_admin") {
+        if (!deviceUser || deviceUser.role !== "platform_admin") {
           setAllowed(false);
           setLoading(false);
           return;

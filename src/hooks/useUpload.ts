@@ -169,8 +169,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           let uploaderId: string | null = null;
           if (!guestName) {
             try {
-              const { getDeviceUser } = await import("@/lib/device-user");
-              uploaderId = (await getDeviceUser()).id;
+              const { getOrCreateDeviceUser } = await import("@/lib/device-user");
+              uploaderId = (await getOrCreateDeviceUser()).id;
             } catch {
               const { data: authData } = await supabase.auth.getUser();
               uploaderId = authData.user?.id || null;

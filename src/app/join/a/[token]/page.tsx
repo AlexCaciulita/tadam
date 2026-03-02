@@ -1,20 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import GuestUploadFlow from "@/components/guest/GuestUploadFlow";
-import type { Album, MediaTask } from "@/types/database";
+import GuestNameForm from "@/components/guest/GuestNameForm";
+import type { Album } from "@/types/database";
 import { Loader2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n/LanguageProvider";
 
+const GUEST_KEY_PREFIX = "tadam_guest_album_";
+
 export default function JoinAlbumTokenPage() {
   const { t } = useI18n();
+  const router = useRouter();
   const params = useParams();
   const token = (params.token as string).toLowerCase();
   const [album, setAlbum] = useState<Album | null>(null);
-  const [tasks, setTasks] = useState<MediaTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,20 +36,35 @@ export default function JoinAlbumTokenPage() {
         return;
       }
 
-      setAlbum(data as Album);
+      const albumData = data as Album;
+      setAlbum(albumData);
 
-      const { data: tasksData } = await supabase
-        .from("media_tasks")
-        .select("*")
-        .eq("album_id", data.id)
-        .eq("is_active", true);
+      const storedName = localStorage.getItem(`${GUEST_KEY_PREFIX}${albumData.id}`);
+      if (storedName) {
+        router.replace(`/album/${albumData.id}`);
+        return;
+      }
 
-      setTasks((tasksData as MediaTask[]) || []);
       setLoading(false);
     };
 
     fetchAlbum();
-  }, [token, t]);
+  }, [token, t, router]);
+
+  const handleNameSubmit = async (name: string) => {
+    if (!album) return;
+
+    localStorage.setItem(`${GUEST_KEY_PREFIX}${album.id}`, name);
+
+    const supabase = createClient();
+    await supabase.from("album_members").insert({
+      album_id: album.id,
+      guest_name: name,
+      role: "guest",
+    });
+
+    router.replace(`/album/${album.id}`);
+  };
 
   if (loading) {
     return (
@@ -70,7 +87,5 @@ export default function JoinAlbumTokenPage() {
     );
   }
 
-  return (
-    <GuestUploadFlow album={album} tasks={tasks} joinCode={album.join_code} />
-  );
+  return <GuestNameForm albumName={album.name} onSubmit={handleNameSubmit} />;
 }

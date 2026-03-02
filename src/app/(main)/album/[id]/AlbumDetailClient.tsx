@@ -81,7 +81,7 @@ export default function AlbumDetailClient({
     const resolvePermissions = async () => {
       try {
         const user = await getDeviceUser();
-        const canManage = user.role === "platform_admin";
+        const canManage = user?.role === "platform_admin";
         if (!cancelled) setCanManageMedia(canManage);
       } catch {
         if (!cancelled) setCanManageMedia(false);
@@ -107,6 +107,11 @@ export default function AlbumDetailClient({
     };
   }, [showMoreMenu]);
 
+  // Detect guest name from localStorage (set during the /join flow).
+  const guestName = typeof window !== "undefined"
+    ? localStorage.getItem(`tadam_guest_album_${album.id}`) || undefined
+    : undefined;
+
   const handleUploadComplete = useCallback((media: Media) => {
     setLocalMedia((prev) => {
       if (prev.some((m) => m.id === media.id)) return prev;
@@ -116,6 +121,7 @@ export default function AlbumDetailClient({
 
   const { uploads, uploadFiles, isUploading, reset } = useUpload({
     albumId: album.id,
+    guestName,
     onUploadComplete: handleUploadComplete,
   });
 

@@ -7,7 +7,7 @@ import Button from "@/components/shared/Button";
 import Toggle from "@/components/shared/Toggle";
 import Avatar from "@/components/shared/Avatar";
 import { generateAlbumPublicToken, generateJoinCode } from "@/lib/utils/qr-generate";
-import { getDeviceUser } from "@/lib/device-user";
+import { getOrCreateDeviceUser } from "@/lib/device-user";
 
 export default function CreateAlbumPage() {
   const [name, setName] = useState("");
@@ -27,7 +27,7 @@ export default function CreateAlbumPage() {
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
-      const deviceUser = await getDeviceUser();
+      const deviceUser = await getOrCreateDeviceUser();
 
       // Generate stable invite identifiers
       const joinCode = generateJoinCode();

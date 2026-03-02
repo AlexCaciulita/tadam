@@ -35,7 +35,7 @@ export default function MainLayoutClient({
     const init = async () => {
       try {
         const deviceUser = await getDeviceUser();
-        setUser(deviceUser);
+        if (deviceUser) setUser(deviceUser);
       } catch (err) {
         console.error("Failed to init device user:", err);
       } finally {

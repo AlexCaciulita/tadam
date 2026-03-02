@@ -34,6 +34,10 @@ export default function AlbumHubPage() {
     const fetchAlbums = async () => {
       try {
         const deviceUser = await getDeviceUser();
+        if (!deviceUser) {
+          setLoading(false);
+          return;
+        }
         const supabase = createClient();
 
         const [ownedAlbumsRes, membershipsRes] = await Promise.all([

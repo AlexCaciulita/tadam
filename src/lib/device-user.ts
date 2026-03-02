@@ -23,11 +23,37 @@ export function getDeviceId(): string {
 }
 
 /**
+ * Look up the current device/auth user's profile WITHOUT creating one.
+ * Returns null if no profile exists yet.
+ */
+export async function getDeviceUser(): Promise<Profile | null> {
+  const supabase = createClient();
+  const { data: authData } = await supabase.auth.getUser();
+  const authUser = authData.user;
+  const id = authUser?.id || getDeviceId();
+
+  if (cachedUser?.id === id) return cachedUser;
+  cachedUser = null;
+
+  const { data: existingProfile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (existingProfile) {
+    cachedUser = existingProfile as Profile;
+  }
+
+  return cachedUser;
+}
+
+/**
  * Get or create a device user with a profile row in Supabase.
- * Uses upsert to avoid race conditions between select/insert.
+ * Only call this when the user takes an explicit action (creating albums, uploading, etc.).
  * Caches the result in memory.
  */
-export async function getDeviceUser(): Promise<Profile> {
+export async function getOrCreateDeviceUser(): Promise<Profile> {
   const supabase = createClient();
   const { data: authData } = await supabase.auth.getUser();
   const authUser = authData.user;
