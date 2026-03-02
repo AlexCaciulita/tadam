@@ -95,7 +95,7 @@ export default function AdminPage() {
     requestedSection === "albums" ||
     requestedSection === "new_wedding"
       ? requestedSection
-      : "profiles";
+      : "couples";
 
   const setSection = (section: AdminSection) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -763,63 +763,6 @@ export default function AdminPage() {
         </section>
       )}
 
-      {activeSection === "profiles" && (
-        <section className="rounded-xl border border-border bg-white p-4">
-          <h2 className="text-lg font-semibold text-foreground mb-3">Profiles</h2>
-          <div className="space-y-2">
-            {(data?.profiles || []).slice(0, 100).map((profile) => {
-              const isCurrentAdmin = profile.id === adminId;
-              return (
-                <div
-                  key={profile.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-surface/60"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {profile.display_name || profile.username}
-                    </p>
-                    <p className="text-xs text-muted truncate">@{profile.username}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted">{profile.role}</span>
-                    {!isCurrentAdmin && profile.role !== "platform_admin" && (
-                      <button
-                        type="button"
-                        disabled={busy === `role-${profile.id}`}
-                        onClick={() => handleSetRole(profile.id, "platform_admin")}
-                        className="text-xs px-2 py-1 rounded border border-border hover:bg-white"
-                      >
-                        Make Admin
-                      </button>
-                    )}
-                    {!isCurrentAdmin && profile.role === "platform_admin" && (
-                      <button
-                        type="button"
-                        disabled={busy === `role-${profile.id}`}
-                        onClick={() => handleSetRole(profile.id, "user")}
-                        className="text-xs px-2 py-1 rounded border border-border hover:bg-white"
-                      >
-                        Make User
-                      </button>
-                    )}
-                    {!isCurrentAdmin && (
-                      <button
-                        type="button"
-                        disabled={busy === `delete-profile-${profile.id}`}
-                        onClick={() => handleDeleteProfile(profile)}
-                        className="text-xs px-2 py-1 rounded border border-danger/30 text-danger hover:bg-danger/5 disabled:opacity-50"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
       {activeSection === "couples" && (
         <section className="rounded-xl border border-border bg-white p-4">
           <h2 className="text-lg font-semibold text-foreground mb-3">Couples</h2>
@@ -958,6 +901,63 @@ export default function AdminPage() {
               )}
             </div>
           )}
+        </section>
+      )}
+
+      {activeSection === "profiles" && (
+        <section className="rounded-xl border border-border bg-white p-4">
+          <h2 className="text-lg font-semibold text-foreground mb-3">Profiles</h2>
+          <div className="space-y-2">
+            {(data?.profiles || []).slice(0, 100).map((profile) => {
+              const isCurrentAdmin = profile.id === adminId;
+              return (
+                <div
+                  key={profile.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-surface/60"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {profile.display_name || profile.username}
+                    </p>
+                    <p className="text-xs text-muted truncate">@{profile.username}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted">{profile.role}</span>
+                    {!isCurrentAdmin && profile.role !== "platform_admin" && (
+                      <button
+                        type="button"
+                        disabled={busy === `role-${profile.id}`}
+                        onClick={() => handleSetRole(profile.id, "platform_admin")}
+                        className="text-xs px-2 py-1 rounded border border-border hover:bg-white"
+                      >
+                        Make Admin
+                      </button>
+                    )}
+                    {!isCurrentAdmin && profile.role === "platform_admin" && (
+                      <button
+                        type="button"
+                        disabled={busy === `role-${profile.id}`}
+                        onClick={() => handleSetRole(profile.id, "user")}
+                        className="text-xs px-2 py-1 rounded border border-border hover:bg-white"
+                      >
+                        Make User
+                      </button>
+                    )}
+                    {!isCurrentAdmin && (
+                      <button
+                        type="button"
+                        disabled={busy === `delete-profile-${profile.id}`}
+                        onClick={() => handleDeleteProfile(profile)}
+                        className="text-xs px-2 py-1 rounded border border-danger/30 text-danger hover:bg-danger/5 disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </section>
       )}
 

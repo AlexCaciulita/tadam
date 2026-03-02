@@ -197,14 +197,14 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           const { createClient } = await import("@/lib/supabase/client");
           const supabase = createClient();
 
+          // Use existing auth user if available, but never create new profiles
           let uploaderId: string | null = null;
           if (!guestName) {
             try {
-              const { getOrCreateDeviceUser } = await import("@/lib/device-user");
-              uploaderId = (await getOrCreateDeviceUser()).id;
-            } catch {
               const { data: authData } = await supabase.auth.getUser();
               uploaderId = authData.user?.id || null;
+            } catch {
+              uploaderId = null;
             }
           }
 
