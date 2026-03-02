@@ -177,7 +177,6 @@ export default function SharePage() {
       try {
         await navigator.share({
           title: selectedAlbum?.name || "MemoriesBox Album",
-          text: t("share.joinAlbumText"),
           url: shareUrl,
         });
         return;
@@ -225,7 +224,7 @@ export default function SharePage() {
             <Share2 className="w-3 h-3" /> {t("common.shareLink")}
           </button>
           <Link
-            href={`/album/${selectedAlbum.id}`}
+            href={`/a/${selectedAlbum.id}`}
             className="min-w-[106px] justify-center text-xs px-3 py-1.5 rounded-xl border border-border hover:bg-surface inline-flex items-center gap-1"
           >
             <ExternalLink className="w-3 h-3" /> {t("common.openAlbum")}

@@ -173,7 +173,6 @@ export default function AlbumDetailClient({
       try {
         await navigator.share({
           title: albumName,
-          text: `Join my album "${albumName}" on MemoriesBox!`,
           url: joinUrl,
         });
       } catch {
