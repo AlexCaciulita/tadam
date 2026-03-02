@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { compressImage, compressVideo, getImageDimensions, createFilePreview, revokeFilePreview } from "@/lib/utils/image-resize";
+import { compressImage, getImageDimensions, createFilePreview, revokeFilePreview } from "@/lib/utils/image-resize";
 import type { UploadFile, Media } from "@/types/database";
 
 interface UseUploadOptions {
@@ -85,20 +85,11 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
   const uploadFileReal = useCallback(
     async (uploadFile: UploadFile) => {
       try {
-        // Step 1: Compress media
+        // Step 1: Compress images (videos are uploaded as-is)
         updateUpload(uploadFile.id, { status: "compressing", progress: 5 });
 
         const isVideo = uploadFile.file.type.startsWith("video/");
-        let compressed: File;
-
-        if (isVideo) {
-          compressed = await compressVideo(uploadFile.file, (fraction) => {
-            // Map compression progress to 5-20% range
-            updateUpload(uploadFile.id, { progress: Math.round(5 + fraction * 15) });
-          });
-        } else {
-          compressed = await compressImage(uploadFile.file);
-        }
+        const compressed = isVideo ? uploadFile.file : await compressImage(uploadFile.file);
 
         // Step 2: Get dimensions
         updateUpload(uploadFile.id, { progress: 22 });
