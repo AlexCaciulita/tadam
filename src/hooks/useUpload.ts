@@ -33,8 +33,13 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         updateUpload(uploadFile.id, { status: "compressing", progress: 10 });
         const compressed = await compressImage(uploadFile.file);
 
-        // Step 2: Get dimensions
-        const dimensions = await getImageDimensions(compressed);
+        // Step 2: Get dimensions (optional — continue without on failure)
+        let dimensions: { width: number; height: number } | null = null;
+        try {
+          dimensions = await getImageDimensions(compressed);
+        } catch {
+          // Continue without dimensions
+        }
         updateUpload(uploadFile.id, { progress: 30 });
 
         // Step 3: Simulate upload delay
@@ -62,8 +67,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           file_url: localUrl,
           thumbnail_url: null,
           media_type: mediaType as "photo" | "video",
-          width: dimensions.width,
-          height: dimensions.height,
+          width: dimensions?.width ?? null,
+          height: dimensions?.height ?? null,
           file_size: compressed.size,
           created_at: new Date().toISOString(),
           reaction_count: 0,
@@ -91,9 +96,14 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         const isVideo = uploadFile.file.type.startsWith("video/");
         const compressed = isVideo ? uploadFile.file : await compressImage(uploadFile.file);
 
-        // Step 2: Get dimensions
+        // Step 2: Get dimensions (optional for videos — metadata may be slow to read)
         updateUpload(uploadFile.id, { progress: 22 });
-        const dimensions = await getImageDimensions(compressed);
+        let dimensions: { width: number; height: number } | null = null;
+        try {
+          dimensions = await getImageDimensions(compressed);
+        } catch {
+          // Dimensions are nullable in DB — continue upload without them
+        }
         updateUpload(uploadFile.id, { progress: 25 });
 
         // Step 3: Get presigned upload URL (small JSON request, no file body)
@@ -130,8 +140,9 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           const xhr = new XMLHttpRequest();
           xhr.open("PUT", uploadUrl);
           xhr.setRequestHeader("Content-Type", compressed.type || "application/octet-stream");
-          // Scale timeout with file size: min 2 min, ~4s per MB, max 30 min
-          xhr.timeout = Math.min(Math.max(120_000, compressed.size / 256), 1_800_000);
+          // Scale timeout: min 2 min, ~15s per MB, max 1 hour (matches presigned URL expiry)
+          const sizeMB = Math.ceil(compressed.size / (1024 * 1024));
+          xhr.timeout = Math.min(Math.max(120_000, sizeMB * 15_000), 3_600_000);
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -145,12 +156,12 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve();
             } else {
-              reject(new Error(`Upload to storage failed (${xhr.status})`));
+              reject(new Error(`Upload to storage failed (HTTP ${xhr.status})`));
             }
           };
 
-          xhr.onerror = () => reject(new Error("Upload to storage failed (network error)"));
-          xhr.ontimeout = () => reject(new Error("Upload timed out"));
+          xhr.onerror = () => reject(new Error("Upload failed — check your network connection"));
+          xhr.ontimeout = () => reject(new Error(`Upload timed out (${sizeMB}MB file)`));
 
           xhr.send(compressed);
         });
@@ -170,8 +181,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
               objectKey,
               mediaType,
               fileSize: compressed.size,
-              width: dimensions.width,
-              height: dimensions.height,
+              width: dimensions?.width,
+              height: dimensions?.height,
             }),
           });
 
@@ -209,8 +220,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
               storage_provider: "r2",
               storage_key: objectKey,
               media_type: mediaType,
-              width: dimensions.width,
-              height: dimensions.height,
+              width: dimensions?.width,
+              height: dimensions?.height,
               file_size: compressed.size,
             })
             .select()
@@ -232,8 +243,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
                   guest_name: guestName || null,
                   file_url: fileUrl,
                   media_type: mediaType,
-                  width: dimensions.width,
-                  height: dimensions.height,
+                  width: dimensions?.width,
+                  height: dimensions?.height,
                   file_size: compressed.size,
                 })
                 .select()
@@ -258,8 +269,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
                   storage_provider: "r2",
                   storage_key: objectKey,
                   media_type: mediaType,
-                  width: dimensions.width,
-                  height: dimensions.height,
+                  width: dimensions?.width,
+                  height: dimensions?.height,
                   file_size: compressed.size,
                 })
                 .select()
@@ -310,8 +321,9 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
 
       const doUpload = isDemoMode() ? uploadFileDemo : uploadFileReal;
 
-      // Upload all files concurrently (max 3 at a time)
-      const batchSize = 3;
+      // Upload concurrently: 3 at a time for small files, 1 at a time if any file > 50MB
+      const hasLargeFile = fileArray.some((f) => f.size > 50 * 1024 * 1024);
+      const batchSize = hasLargeFile ? 1 : 3;
       for (let i = 0; i < newUploads.length; i += batchSize) {
         const batch = newUploads.slice(i, i + batchSize);
         await Promise.all(batch.map(doUpload));

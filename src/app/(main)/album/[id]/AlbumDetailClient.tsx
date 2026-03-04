@@ -57,7 +57,7 @@ export default function AlbumDetailClient({
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [localMedia, setLocalMedia] = useState<Media[]>([]);
   const [copied, setCopied] = useState(false);
-  const [mediaView, setMediaView] = useState<MediaGalleryView>("grid");
+  const [mediaView, setMediaView] = useState<MediaGalleryView>("masonry");
   const [canManageMedia, setCanManageMedia] = useState(false);
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(album.cover_image_url || null);
   const [albumName, setAlbumName] = useState(album.name);

@@ -41,9 +41,11 @@ export function getImageDimensions(
   file: File
 ): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
+    // Scale timeout with file size: 15s base, +1s per 10MB, max 120s
+    const timeoutMs = Math.min(15_000 + Math.ceil(file.size / (10 * 1024 * 1024)) * 1000, 120_000);
     const timeout = setTimeout(() => {
       reject(new Error("Timed out reading dimensions"));
-    }, 15_000);
+    }, timeoutMs);
 
     if (file.type.startsWith("video/")) {
       const video = document.createElement("video");

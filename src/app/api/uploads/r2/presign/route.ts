@@ -30,14 +30,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 413 });
     }
 
-    // Give more time for larger files (min 5 min, up to 30 min for 500MB)
+    // Give more time for larger files (min 5 min, ~15s per MB, up to 1 hour)
     const sizeBytes = typeof fileSize === "number" ? fileSize : 0;
-    const expiresInSeconds = Math.max(300, Math.ceil(sizeBytes / (1024 * 1024)) * 4);
+    const expiresInSeconds = Math.min(
+      Math.max(300, Math.ceil(sizeBytes / (1024 * 1024)) * 15),
+      3600
+    );
 
     const objectKey = buildObjectKey(albumId, fileName);
     const { uploadUrl, fileUrl } = await createUploadUrl({
       objectKey,
-      expiresInSeconds: Math.min(expiresInSeconds, 1800),
+      expiresInSeconds,
     });
 
     return NextResponse.json({
