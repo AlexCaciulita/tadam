@@ -18,17 +18,20 @@ export default function UploadProgress({
   isUploading,
   onClose,
 }: UploadProgressProps) {
-  // Auto-dismiss once all uploads finish
+  const hasErrors = uploads.some((u) => u.status === "error");
+
+  // Auto-dismiss only when all uploads succeeded (not when there are errors)
   useEffect(() => {
-    if (uploads.length > 0 && !isUploading) {
+    if (uploads.length > 0 && !isUploading && !hasErrors) {
       const timer = setTimeout(onClose, 1500);
       return () => clearTimeout(timer);
     }
-  }, [isUploading, uploads.length, onClose]);
+  }, [isUploading, uploads.length, hasErrors, onClose]);
 
   if (uploads.length === 0) return null;
 
   const completed = uploads.filter((u) => u.status === "success").length;
+  const failed = uploads.filter((u) => u.status === "error").length;
   const total = uploads.length;
 
   return (
@@ -45,7 +48,9 @@ export default function UploadProgress({
             <h3 className="text-sm font-bold">
               {isUploading
                 ? `Uploading ${completed}/${total}...`
-                : `${completed}/${total} uploaded`}
+                : failed > 0
+                  ? `${failed} failed, ${completed} uploaded`
+                  : `${completed}/${total} uploaded`}
             </h3>
           </div>
           {!isUploading && (
@@ -61,7 +66,7 @@ export default function UploadProgress({
         {/* Overall progress bar */}
         <div className="h-1 bg-surface">
           <motion.div
-            className="h-full bg-primary"
+            className={cn("h-full", hasErrors ? "bg-danger" : "bg-primary")}
             initial={{ width: 0 }}
             animate={{
               width: `${total > 0 ? (completed / total) * 100 : 0}%`,
@@ -99,6 +104,13 @@ export default function UploadProgress({
                     <p className="text-[10px] text-primary">Compressing...</p>
                   )}
                 </div>
+
+                {/* Error message */}
+                {upload.status === "error" && upload.error && (
+                  <p className="text-[10px] text-danger mt-0.5 truncate">
+                    {upload.error}
+                  </p>
+                )}
 
                 {/* Progress bar */}
                 {(upload.status === "uploading" || upload.status === "compressing") && (
