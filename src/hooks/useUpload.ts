@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { compressImage, getImageDimensions, createFilePreview, revokeFilePreview } from "@/lib/utils/image-resize";
+import { compressImage, getImageDimensions, createFilePreview, revokeFilePreview, isVideoFile, detectMimeType } from "@/lib/utils/image-resize";
 import type { UploadFile, Media } from "@/types/database";
 
 interface UseUploadOptions {
@@ -50,7 +50,7 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         updateUpload(uploadFile.id, { progress: 75 });
         await new Promise((r) => setTimeout(r, 400));
 
-        const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
+        const mediaType = isVideoFile(compressed) ? "video" : "photo";
         const localUrl = createFilePreview(compressed);
         const mediaId = `demo-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
@@ -95,7 +95,7 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         // Step 1: Compress images (videos are uploaded as-is)
         updateUpload(uploadFile.id, { status: "compressing", progress: 5 });
 
-        const isVideo = uploadFile.file.type.startsWith("video/");
+        const isVideo = isVideoFile(uploadFile.file);
         const compressed = isVideo ? uploadFile.file : await compressImage(uploadFile.file);
 
         // Step 2: Get dimensions (skip for videos — loading metadata blocks on mobile)
@@ -113,7 +113,8 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         // Step 3: Upload to R2
         updateUpload(uploadFile.id, { status: "uploading", progress: 28 });
 
-        const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
+        const detectedType = detectMimeType(compressed);
+        const mediaType = detectedType.startsWith("video/") ? "video" : "photo";
         let fileUrl: string;
         let objectKey: string;
 
@@ -124,7 +125,7 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
             file: compressed,
             albumId,
             fileName: compressed.name || "upload.bin",
-            contentType: compressed.type || "application/octet-stream",
+            contentType: detectedType,
           });
 
           controller.onProgress(({ loaded, total }) => {
@@ -143,7 +144,7 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
             body: JSON.stringify({
               albumId,
               fileName: compressed.name || "upload.bin",
-              contentType: compressed.type || "application/octet-stream",
+              contentType: detectedType,
               fileSize: compressed.size,
             }),
           });
@@ -167,7 +168,7 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
           await new Promise<void>((resolve, reject) => {
             const xhr = new XMLHttpRequest();
             xhr.open("PUT", presignResult.uploadUrl);
-            xhr.setRequestHeader("Content-Type", compressed.type || "application/octet-stream");
+            xhr.setRequestHeader("Content-Type", detectedType);
             const sizeMB = Math.ceil(compressed.size / (1024 * 1024));
             xhr.timeout = Math.min(Math.max(120_000, sizeMB * 15_000), 3_600_000);
 

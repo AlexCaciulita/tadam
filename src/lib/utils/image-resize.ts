@@ -12,12 +12,56 @@ const defaultOptions: CompressionOptions = {
   useWebWorker: true,
 };
 
+const VIDEO_EXTENSIONS = new Set([
+  "mov", "mp4", "m4v", "avi", "wmv", "flv", "mkv", "webm", "3gp", "3g2",
+]);
+const IMAGE_EXTENSIONS = new Set([
+  "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "tiff", "tif", "svg", "avif",
+]);
+
+/**
+ * Detect MIME type from file — uses file.type if available,
+ * falls back to file extension (critical for iOS Safari where
+ * file.type is often empty for gallery-selected videos).
+ */
+export function detectMimeType(file: File): string {
+  if (file.type) return file.type;
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  if (VIDEO_EXTENSIONS.has(ext)) {
+    const map: Record<string, string> = {
+      mov: "video/quicktime", mp4: "video/mp4", m4v: "video/x-m4v",
+      avi: "video/x-msvideo", wmv: "video/x-ms-wmv", flv: "video/x-flv",
+      mkv: "video/x-matroska", webm: "video/webm", "3gp": "video/3gpp",
+      "3g2": "video/3gpp2",
+    };
+    return map[ext] || "video/mp4";
+  }
+  if (IMAGE_EXTENSIONS.has(ext)) {
+    const map: Record<string, string> = {
+      jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+      gif: "image/gif", webp: "image/webp", heic: "image/heic",
+      heif: "image/heif", bmp: "image/bmp", tiff: "image/tiff",
+      tif: "image/tiff", svg: "image/svg+xml", avif: "image/avif",
+    };
+    return map[ext] || "image/jpeg";
+  }
+  return "application/octet-stream";
+}
+
+/** Check if a file is a video, handling empty file.type on iOS */
+export function isVideoFile(file: File): boolean {
+  if (file.type) return file.type.startsWith("video/");
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  return VIDEO_EXTENSIONS.has(ext);
+}
+
 export async function compressImage(
   file: File,
   options?: CompressionOptions
 ): Promise<File> {
-  // Don't compress videos
-  if (file.type.startsWith("video/")) {
+  // Don't compress videos (handle empty file.type on iOS)
+  if (isVideoFile(file)) {
     return file;
   }
 
@@ -47,7 +91,7 @@ export function getImageDimensions(
       reject(new Error("Timed out reading dimensions"));
     }, timeoutMs);
 
-    if (file.type.startsWith("video/")) {
+    if (isVideoFile(file)) {
       const video = document.createElement("video");
       video.preload = "metadata";
       video.onloadedmetadata = () => {
