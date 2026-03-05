@@ -16,6 +16,8 @@ const isDemoMode = () => {
   return !url || url.includes("your-project");
 };
 
+const MULTIPART_THRESHOLD = 50 * 1024 * 1024; // 50MB
+
 export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: UseUploadOptions) {
   const [uploads, setUploads] = useState<UploadFile[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -106,65 +108,88 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         }
         updateUpload(uploadFile.id, { progress: 25 });
 
-        // Step 3: Get presigned upload URL (small JSON request, no file body)
+        // Step 3: Upload to R2
         updateUpload(uploadFile.id, { status: "uploading", progress: 28 });
 
         const mediaType = compressed.type.startsWith("video/") ? "video" : "photo";
+        let fileUrl: string;
+        let objectKey: string;
 
-        const presignResponse = await fetch("/api/uploads/r2/presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        if (compressed.size > MULTIPART_THRESHOLD) {
+          // Multipart upload for large files (>50MB)
+          const { startMultipartUpload } = await import("@/lib/r2/multipart-client");
+          const controller = startMultipartUpload({
+            file: compressed,
             albumId,
             fileName: compressed.name || "upload.bin",
             contentType: compressed.type || "application/octet-stream",
-            fileSize: compressed.size,
-          }),
-        });
+          });
 
-        if (!presignResponse.ok) {
-          const errorData = (await presignResponse.json().catch(() => ({}))) as { error?: string };
-          throw new Error(errorData.error || "Failed to get upload URL");
+          controller.onProgress(({ loaded, total }) => {
+            const pct = Math.round(28 + (loaded / total) * 42);
+            updateUpload(uploadFile.id, { progress: pct });
+          });
+
+          const result = await controller.promise;
+          fileUrl = result.fileUrl;
+          objectKey = result.objectKey;
+        } else {
+          // Single PUT for small files (<=50MB)
+          const presignResponse = await fetch("/api/uploads/r2/presign", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              albumId,
+              fileName: compressed.name || "upload.bin",
+              contentType: compressed.type || "application/octet-stream",
+              fileSize: compressed.size,
+            }),
+          });
+
+          if (!presignResponse.ok) {
+            const errorData = (await presignResponse.json().catch(() => ({}))) as { error?: string };
+            throw new Error(errorData.error || "Failed to get upload URL");
+          }
+
+          const presignResult = (await presignResponse.json()) as {
+            uploadUrl: string;
+            fileUrl: string;
+            objectKey: string;
+          };
+          fileUrl = presignResult.fileUrl;
+          objectKey = presignResult.objectKey;
+
+          updateUpload(uploadFile.id, { progress: 35 });
+
+          // Upload file directly from browser to R2 via XHR for real progress tracking
+          await new Promise<void>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open("PUT", presignResult.uploadUrl);
+            xhr.setRequestHeader("Content-Type", compressed.type || "application/octet-stream");
+            const sizeMB = Math.ceil(compressed.size / (1024 * 1024));
+            xhr.timeout = Math.min(Math.max(120_000, sizeMB * 15_000), 3_600_000);
+
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                const pct = Math.round(35 + (event.loaded / event.total) * 35);
+                updateUpload(uploadFile.id, { progress: pct });
+              }
+            };
+
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                resolve();
+              } else {
+                reject(new Error(`Upload to storage failed (HTTP ${xhr.status})`));
+              }
+            };
+
+            xhr.onerror = () => reject(new Error("Upload failed — check your network connection"));
+            xhr.ontimeout = () => reject(new Error(`Upload timed out (${sizeMB}MB file)`));
+
+            xhr.send(compressed);
+          });
         }
-
-        const { uploadUrl, fileUrl, objectKey } = (await presignResponse.json()) as {
-          uploadUrl: string;
-          fileUrl: string;
-          objectKey: string;
-        };
-
-        updateUpload(uploadFile.id, { progress: 35 });
-
-        // Step 4: Upload file directly from browser to R2 via XHR for real progress tracking
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("PUT", uploadUrl);
-          xhr.setRequestHeader("Content-Type", compressed.type || "application/octet-stream");
-          // Scale timeout: min 2 min, ~15s per MB, max 1 hour (matches presigned URL expiry)
-          const sizeMB = Math.ceil(compressed.size / (1024 * 1024));
-          xhr.timeout = Math.min(Math.max(120_000, sizeMB * 15_000), 3_600_000);
-
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              // Map upload progress to 35-70% range
-              const pct = Math.round(35 + (event.loaded / event.total) * 35);
-              updateUpload(uploadFile.id, { progress: pct });
-            }
-          };
-
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve();
-            } else {
-              reject(new Error(`Upload to storage failed (HTTP ${xhr.status})`));
-            }
-          };
-
-          xhr.onerror = () => reject(new Error("Upload failed — check your network connection"));
-          xhr.ontimeout = () => reject(new Error(`Upload timed out (${sizeMB}MB file)`));
-
-          xhr.send(compressed);
-        });
 
         updateUpload(uploadFile.id, { progress: 70 });
 

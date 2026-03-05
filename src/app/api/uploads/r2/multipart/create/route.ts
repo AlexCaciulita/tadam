@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { buildObjectKey, createUploadUrl } from "@/lib/r2/server";
+import { buildObjectKey, buildPublicFileUrl, createMultipartUpload } from "@/lib/r2/server";
 
 const ALLOWED_MIME_PREFIXES = ["image/", "video/"];
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
@@ -30,26 +30,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "File too large" }, { status: 413 });
     }
 
-    // Give more time for larger files (min 5 min, ~15s per MB, up to 1 hour)
-    const sizeBytes = typeof fileSize === "number" ? fileSize : 0;
-    const expiresInSeconds = Math.min(
-      Math.max(300, Math.ceil(sizeBytes / (1024 * 1024)) * 15),
-      3600
-    );
-
     const objectKey = buildObjectKey(albumId, fileName);
-    const { uploadUrl, fileUrl } = await createUploadUrl({
-      objectKey,
-      expiresInSeconds,
-    });
+    const { uploadId } = await createMultipartUpload(objectKey);
+    const fileUrl = buildPublicFileUrl(objectKey);
 
-    return NextResponse.json({
-      uploadUrl,
-      fileUrl,
-      objectKey,
-    });
+    return NextResponse.json({ uploadId, objectKey, fileUrl });
   } catch (error) {
-    console.error("Failed to create R2 upload URL", error);
-    return NextResponse.json({ error: "Failed to create upload URL" }, { status: 500 });
+    console.error("Failed to create multipart upload", error);
+    return NextResponse.json({ error: "Failed to create multipart upload" }, { status: 500 });
   }
 }

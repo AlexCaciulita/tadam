@@ -199,6 +199,251 @@ async function createSignedObjectUrl(options: {
   return `${endpoint}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
 }
 
+// ─── Multipart Upload ──────────────────────────────────────────────
+
+/**
+ * AWS4-signed fetch to R2 using Authorization header.
+ * Used for multipart lifecycle requests (create, complete, abort).
+ */
+async function signedR2Fetch(options: {
+  method: string;
+  objectKey: string;
+  queryString?: string;
+  body?: string;
+  contentType?: string;
+}): Promise<Response> {
+  const bucket = getRequiredEnv("CLOUDFLARE_R2_BUCKET", R2_BUCKET);
+  const { endpoint, accessKeyId, secretAccessKey } = getR2Client();
+  const service = "s3";
+  const region = "auto";
+  const now = new Date();
+  const isoDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = isoDate.slice(0, 8);
+  const host = new URL(endpoint).host;
+
+  const encodedKey = options.objectKey
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const canonicalUri = `/${bucket}/${encodedKey}`;
+
+  const bodyHash = crypto
+    .createHash("sha256")
+    .update(options.body || "")
+    .digest("hex");
+
+  const canonicalQuery = options.queryString || "";
+
+  const hdrs: Record<string, string> = {
+    host,
+    "x-amz-content-sha256": bodyHash,
+    "x-amz-date": isoDate,
+  };
+  if (options.contentType) {
+    hdrs["content-type"] = options.contentType;
+  }
+
+  const signedHeaderNames = Object.keys(hdrs).sort().join(";");
+  const canonicalHeaders =
+    Object.keys(hdrs)
+      .sort()
+      .map((key) => `${key}:${hdrs[key]}`)
+      .join("\n") + "\n";
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+
+  const canonicalRequest = [
+    options.method,
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaderNames,
+    bodyHash,
+  ].join("\n");
+
+  const hashedCanonicalRequest = crypto
+    .createHash("sha256")
+    .update(canonicalRequest)
+    .digest("hex");
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    isoDate,
+    credentialScope,
+    hashedCanonicalRequest,
+  ].join("\n");
+
+  const hmac = (key: Buffer | string, data: string) =>
+    crypto.createHmac("sha256", key).update(data).digest();
+  const kDate = hmac(`AWS4${secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, "aws4_request");
+  const signature = crypto
+    .createHmac("sha256", kSigning)
+    .update(stringToSign)
+    .digest("hex");
+
+  const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaderNames}, Signature=${signature}`;
+
+  const fetchHeaders: Record<string, string> = {
+    Authorization: authorization,
+    "x-amz-content-sha256": bodyHash,
+    "x-amz-date": isoDate,
+  };
+  if (options.contentType) {
+    fetchHeaders["Content-Type"] = options.contentType;
+  }
+
+  const url = `${endpoint}${canonicalUri}${canonicalQuery ? `?${canonicalQuery}` : ""}`;
+  return fetch(url, {
+    method: options.method,
+    headers: fetchHeaders,
+    body: options.body || undefined,
+  });
+}
+
+export async function createMultipartUpload(objectKey: string): Promise<{ uploadId: string }> {
+  const response = await signedR2Fetch({
+    method: "POST",
+    objectKey,
+    queryString: "uploads=",
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    throw new Error(`R2 CreateMultipartUpload failed (${response.status}): ${body}`);
+  }
+
+  const xml = await response.text();
+  const match = xml.match(/<UploadId>(.+?)<\/UploadId>/);
+  if (!match?.[1]) {
+    throw new Error("R2 CreateMultipartUpload: no UploadId in response");
+  }
+
+  return { uploadId: match[1] };
+}
+
+export async function createPartUploadUrl(options: {
+  objectKey: string;
+  uploadId: string;
+  partNumber: number;
+  expiresInSeconds?: number;
+}): Promise<string> {
+  const bucket = getRequiredEnv("CLOUDFLARE_R2_BUCKET", R2_BUCKET);
+  const { endpoint, accessKeyId, secretAccessKey } = getR2Client();
+  const expires = options.expiresInSeconds ?? 3600;
+  const service = "s3";
+  const region = "auto";
+  const now = new Date();
+  const isoDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = isoDate.slice(0, 8);
+  const host = new URL(endpoint).host;
+
+  const encodedKey = options.objectKey
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
+  const canonicalUri = `/${bucket}/${encodedKey}`;
+
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const queryParams = new URLSearchParams({
+    "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+    "X-Amz-Credential": `${accessKeyId}/${credentialScope}`,
+    "X-Amz-Date": isoDate,
+    "X-Amz-Expires": String(expires),
+    "X-Amz-SignedHeaders": "host",
+    partNumber: String(options.partNumber),
+    uploadId: options.uploadId,
+  });
+
+  const canonicalQuery = [...queryParams.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`
+    )
+    .join("&");
+
+  const canonicalHeaders = `host:${host}\n`;
+  const canonicalRequest = [
+    "PUT",
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    "host",
+    "UNSIGNED-PAYLOAD",
+  ].join("\n");
+
+  const hashedCanonicalRequest = crypto
+    .createHash("sha256")
+    .update(canonicalRequest)
+    .digest("hex");
+
+  const stringToSign = [
+    "AWS4-HMAC-SHA256",
+    isoDate,
+    credentialScope,
+    hashedCanonicalRequest,
+  ].join("\n");
+
+  const hmac = (key: Buffer | string, data: string) =>
+    crypto.createHmac("sha256", key).update(data).digest();
+  const kDate = hmac(`AWS4${secretAccessKey}`, dateStamp);
+  const kRegion = hmac(kDate, region);
+  const kService = hmac(kRegion, service);
+  const kSigning = hmac(kService, "aws4_request");
+  const signature = crypto
+    .createHmac("sha256", kSigning)
+    .update(stringToSign)
+    .digest("hex");
+
+  return `${endpoint}${canonicalUri}?${canonicalQuery}&X-Amz-Signature=${signature}`;
+}
+
+export async function completeMultipartUpload(options: {
+  objectKey: string;
+  uploadId: string;
+  parts: { partNumber: number; etag: string }[];
+}): Promise<void> {
+  const partsXml = options.parts
+    .sort((a, b) => a.partNumber - b.partNumber)
+    .map(
+      (p) =>
+        `<Part><PartNumber>${p.partNumber}</PartNumber><ETag>${p.etag}</ETag></Part>`
+    )
+    .join("");
+  const body = `<CompleteMultipartUpload>${partsXml}</CompleteMultipartUpload>`;
+
+  const response = await signedR2Fetch({
+    method: "POST",
+    objectKey: options.objectKey,
+    queryString: `uploadId=${encodeURIComponent(options.uploadId)}`,
+    body,
+    contentType: "application/xml",
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`R2 CompleteMultipartUpload failed (${response.status}): ${text}`);
+  }
+}
+
+export async function abortMultipartUpload(options: {
+  objectKey: string;
+  uploadId: string;
+}): Promise<void> {
+  const response = await signedR2Fetch({
+    method: "DELETE",
+    objectKey: options.objectKey,
+    queryString: `uploadId=${encodeURIComponent(options.uploadId)}`,
+  });
+
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text().catch(() => "");
+    throw new Error(`R2 AbortMultipartUpload failed (${response.status}): ${text}`);
+  }
+}
+
 export async function deleteObject(objectKey: string) {
   const deleteUrl = await createSignedObjectUrl({
     objectKey,
