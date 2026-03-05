@@ -73,7 +73,14 @@ export async function compressImage(
   const mergedOptions = { ...defaultOptions, ...options };
 
   try {
-    const compressedFile = await imageCompression(file, mergedOptions);
+    // Race compression against a 30s timeout — browser-image-compression can hang
+    // on certain file types (e.g. undetected videos, corrupt images).
+    const compressedFile = await Promise.race([
+      imageCompression(file, mergedOptions),
+      new Promise<File>((_, reject) =>
+        setTimeout(() => reject(new Error("Compression timed out")), 30_000)
+      ),
+    ]);
     return compressedFile;
   } catch (error) {
     console.error("Image compression failed:", error);
@@ -115,7 +122,11 @@ export function getImageDimensions(
 }
 
 export function createFilePreview(file: File): string {
-  return URL.createObjectURL(file);
+  try {
+    return URL.createObjectURL(file);
+  } catch {
+    return "";
+  }
 }
 
 export function revokeFilePreview(url: string): void {

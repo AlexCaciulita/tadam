@@ -5,7 +5,7 @@ import { ImagePlus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
 interface UploadButtonProps {
-  onFilesSelected: (files: FileList) => void;
+  onFilesSelected: (files: File[]) => void;
   className?: string;
   variant?: "fab" | "inline" | "icon";
 }
@@ -21,25 +21,25 @@ export default function UploadButton({
   const handleClick = () => {
     setPreparing(true);
     inputRef.current?.click();
-    // If user cancels the picker, reset after a timeout
-    // (no reliable "cancel" event exists for file inputs)
-    setTimeout(() => setPreparing(false), 60_000);
+    // If user cancels the picker, reset after a generous timeout.
+    // On iOS the system may take 1-2+ minutes to export large videos
+    // from the photo library before onChange fires.
+    setTimeout(() => setPreparing(false), 180_000);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPreparing(false);
-    if (e.target.files && e.target.files.length > 0) {
-      onFilesSelected(e.target.files);
-      // Reset input so same file can be selected again
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Copy file references immediately before resetting the input.
+      // On some mobile browsers, resetting the input can invalidate the FileList.
+      const fileArray = Array.from(files);
+      // Reset input so the same file can be selected again
       e.target.value = "";
+      setPreparing(false);
+      onFilesSelected(fileArray);
+    } else {
+      setPreparing(false);
     }
-  };
-
-  // On mobile, the picker losing focus fires a window focus event
-  // Use this to clear the preparing state if no files were selected
-  const handleWindowFocus = () => {
-    // Small delay — onChange fires slightly after focus on some browsers
-    setTimeout(() => setPreparing(false), 500);
   };
 
   const fileInput = (
@@ -49,9 +49,6 @@ export default function UploadButton({
       accept="image/*,video/*"
       multiple
       onChange={handleChange}
-      onBlur={() => {
-        window.addEventListener("focus", handleWindowFocus, { once: true });
-      }}
       className="hidden"
     />
   );

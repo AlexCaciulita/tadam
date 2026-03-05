@@ -334,30 +334,37 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
       const fileArray = Array.from(files);
+      if (fileArray.length === 0) return;
+
       setIsUploading(true);
 
-      // Create upload entries
-      const newUploads: UploadFile[] = fileArray.map((file) => ({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        file,
-        preview: createFilePreview(file),
-        progress: 0,
-        status: "pending" as const,
-      }));
+      try {
+        // Create upload entries — preview creation is wrapped in try/catch
+        // inside createFilePreview so it never throws.
+        const newUploads: UploadFile[] = fileArray.map((file) => ({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          file,
+          preview: createFilePreview(file),
+          progress: 0,
+          status: "pending" as const,
+        }));
 
-      setUploads((prev) => [...prev, ...newUploads]);
+        setUploads((prev) => [...prev, ...newUploads]);
 
-      const doUpload = isDemoMode() ? uploadFileDemo : uploadFileReal;
+        const doUpload = isDemoMode() ? uploadFileDemo : uploadFileReal;
 
-      // Upload concurrently: 3 at a time for small files, 1 at a time if any file > 50MB
-      const hasLargeFile = fileArray.some((f) => f.size > 50 * 1024 * 1024);
-      const batchSize = hasLargeFile ? 1 : 3;
-      for (let i = 0; i < newUploads.length; i += batchSize) {
-        const batch = newUploads.slice(i, i + batchSize);
-        await Promise.all(batch.map(doUpload));
+        // Upload concurrently: 3 at a time for small files, 1 at a time if any file > 50MB
+        const hasLargeFile = fileArray.some((f) => f.size > 50 * 1024 * 1024);
+        const batchSize = hasLargeFile ? 1 : 3;
+        for (let i = 0; i < newUploads.length; i += batchSize) {
+          const batch = newUploads.slice(i, i + batchSize);
+          await Promise.all(batch.map(doUpload));
+        }
+      } catch (error) {
+        console.error("Upload batch failed:", error);
+      } finally {
+        setIsUploading(false);
       }
-
-      setIsUploading(false);
     },
     [uploadFileDemo, uploadFileReal]
   );

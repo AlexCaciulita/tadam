@@ -130,7 +130,7 @@ export default function AlbumDetailClient({
     onUploadComplete: handleUploadComplete,
   });
 
-  const handleFilesSelected = (files: FileList) => {
+  const handleFilesSelected = (files: File[]) => {
     uploadFiles(files);
   };
 

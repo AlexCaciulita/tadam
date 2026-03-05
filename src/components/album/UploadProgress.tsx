@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, AlertCircle, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
-import { formatFileSize } from "@/lib/utils/image-resize";
+import { formatFileSize, isVideoFile } from "@/lib/utils/image-resize";
 import type { UploadFile } from "@/types/database";
 
 interface UploadProgressProps {
@@ -84,11 +84,23 @@ export default function UploadProgress({
             >
               {/* Thumbnail */}
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-surface flex-shrink-0">
-                <img
-                  src={upload.preview}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
+                {upload.preview ? (
+                  isVideoFile(upload.file) ? (
+                    <video
+                      src={upload.preview}
+                      muted
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img
+                      src={upload.preview}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  )
+                ) : null}
               </div>
 
               {/* Info */}
