@@ -98,13 +98,15 @@ export function useUpload({ albumId, guestName, joinCode, onUploadComplete }: Us
         const isVideo = uploadFile.file.type.startsWith("video/");
         const compressed = isVideo ? uploadFile.file : await compressImage(uploadFile.file);
 
-        // Step 2: Get dimensions (optional for videos — metadata may be slow to read)
+        // Step 2: Get dimensions (skip for videos — loading metadata blocks on mobile)
         updateUpload(uploadFile.id, { progress: 22 });
         let dimensions: { width: number; height: number } | null = null;
-        try {
-          dimensions = await getImageDimensions(compressed);
-        } catch {
-          // Dimensions are nullable in DB — continue upload without them
+        if (!isVideo) {
+          try {
+            dimensions = await getImageDimensions(compressed);
+          } catch {
+            // Dimensions are nullable in DB — continue upload without them
+          }
         }
         updateUpload(uploadFile.id, { progress: 25 });
 

@@ -45,18 +45,25 @@ export function startMultipartUpload(
   let uploadId: string | null = null;
   let objectKey: string | null = null;
 
-  function uploadChunkXHR(
+  async function uploadChunkXHR(
     url: string,
     chunk: Blob,
-    contentType: string,
     onChunkProgress: (loaded: number) => void
   ): Promise<{ etag: string }> {
+    // Read chunk into memory first — on iOS Safari, file handles from the
+    // photo picker can become invalid, causing silent network errors.
+    let buffer: ArrayBuffer;
+    try {
+      buffer = await chunk.arrayBuffer();
+    } catch {
+      throw new Error("Failed to read file data — file may no longer be accessible");
+    }
+
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       activeXHRs.add(xhr);
 
       xhr.open("PUT", url);
-      xhr.setRequestHeader("Content-Type", contentType);
       xhr.timeout = 120_000; // 2 min per 10MB chunk
 
       xhr.upload.onprogress = (event) => {
@@ -85,7 +92,7 @@ export function startMultipartUpload(
 
       xhr.onerror = () => {
         activeXHRs.delete(xhr);
-        reject(new Error("Part upload network error"));
+        reject(new Error("Part upload network error — possible CORS issue"));
       };
 
       xhr.ontimeout = () => {
@@ -98,7 +105,7 @@ export function startMultipartUpload(
         reject(new Error("Upload aborted"));
       };
 
-      xhr.send(chunk);
+      xhr.send(buffer);
     });
   }
 
@@ -195,7 +202,6 @@ export function startMultipartUpload(
           const { etag } = await uploadChunkXHR(
             url,
             chunk,
-            contentType,
             (loaded) => {
               partProgress[partNumber] = loaded;
               reportProgress();
